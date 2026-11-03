@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self'">
-<meta name="theme-color" content="#5B1A8B">
+<meta name="theme-color" content="#7A003C">
 <meta name="robots" content="noindex">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Finanzas">
@@ -19,25 +19,25 @@
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}
 /* Layout: una mesa de trabajo mensual. Cuatro pasos en secuencia; el paso de asignar es una boleta grande con botones por persona. */
 :root{
-  --bg:#F4F0F9; --surface:#FFFFFF; --sunk:#EAE3F3; --ink:#21102F; --muted:#5F5076; --line:#D7CCE5;
-  --accent:#5B1A8B; --accent-ink:#FFFFFF; --accent-soft:#E8DCF6;
+  --bg:#F4EEF1; --surface:#FBFBFB; --sunk:#ECE2E7; --ink:#2A0A18; --muted:#6B4F5C; --line:#E0D1D8;
+  --accent:#7A003C; --accent-ink:#FBFBFB; --accent-soft:#F3DCE6;
   --warn:#8A5A00; --warn-soft:#FBEFD2; --bad:#AE2A2A; --bad-soft:#FBE3E1; --good:#12683F; --good-soft:#DAF1E3;
-  --p1:#5B1A8B; --p2:#B0307F; --p3:#2B5BB5; --p4:#B4540A; --p5:#0E7490; --p6:#12683F; --p7:#7A6A00; --p8:#A62C4A;
+  --p1:#7A003C; --p2:#2B5BB5; --p3:#0E7490; --p4:#B4540A; --p5:#12683F; --p6:#6A4BB8; --p7:#7A6A00; --p8:#4B5563;
   --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
   --body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#140B1E; --surface:#1F1430; --sunk:#0E0716; --ink:#F1EAF9; --muted:#B5A5CB; --line:#3B2B54;
-  --accent:#BC8FF2; --accent-ink:#1C0B30; --accent-soft:#33204F;
+  --bg:#170A10; --surface:#22111A; --sunk:#10060B; --ink:#F6EDF1; --muted:#C3A7B4; --line:#42202F;
+  --accent:#E07AA5; --accent-ink:#2A0716; --accent-soft:#3E1527;
   --warn:#EFC15F; --warn-soft:#3A2D0E; --bad:#F39A92; --bad-soft:#44201E; --good:#6FD79F; --good-soft:#143524;
-  --p1:#BC8FF2; --p2:#EE8BCB; --p3:#8CB2F7; --p4:#F2A65E; --p5:#5FCBE3; --p6:#6FD79F; --p7:#D9C84E; --p8:#F18BA5;
+  --p1:#E07AA5; --p2:#8CB2F7; --p3:#5FCBE3; --p4:#F2A65E; --p5:#6FD79F; --p6:#B9A2F5; --p7:#D9C84E; --p8:#B8C0CC;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#140B1E; --surface:#1F1430; --sunk:#0E0716; --ink:#F1EAF9; --muted:#B5A5CB; --line:#3B2B54;
-  --accent:#BC8FF2; --accent-ink:#1C0B30; --accent-soft:#33204F;
+  --bg:#170A10; --surface:#22111A; --sunk:#10060B; --ink:#F6EDF1; --muted:#C3A7B4; --line:#42202F;
+  --accent:#E07AA5; --accent-ink:#2A0716; --accent-soft:#3E1527;
   --warn:#EFC15F; --warn-soft:#3A2D0E; --bad:#F39A92; --bad-soft:#44201E; --good:#6FD79F; --good-soft:#143524;
-  --p1:#BC8FF2; --p2:#EE8BCB; --p3:#8CB2F7; --p4:#F2A65E; --p5:#5FCBE3; --p6:#6FD79F; --p7:#D9C84E; --p8:#F18BA5;
+  --p1:#E07AA5; --p2:#8CB2F7; --p3:#5FCBE3; --p4:#F2A65E; --p5:#6FD79F; --p6:#B9A2F5; --p7:#D9C84E; --p8:#B8C0CC;
   color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body)}
