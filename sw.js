@@ -1,6 +1,6 @@
 // Guarda la página para que abra rápido y sin señal. Los datos vienen de
 // Supabase y nunca pasan por este caché; los PDF tampoco.
-const VERSION = "finanzas-v1";
+const VERSION = "finanzas-v2";
 const SHELL = ["./", "manifest.webmanifest", "config.js", "icons/icon-192.png", "icons/icon-512.png"];
 const CDN = ["https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com", "https://fonts.gstatic.com"];
 

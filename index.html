@@ -377,6 +377,8 @@ async function pdfToLines(bytes,password){
 
 /* ---------- Conexión ---------- */
 const XLSX_LIB="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+/* El enlace del correo de "Olvidé mi contraseña" llega con type=recovery en la dirección. Se lee antes de crear el cliente, que la limpia. */
+const RECUPERANDO=/type=recovery/.test(location.hash);
 const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
 const todayIso=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 const daysBetween=(a,b)=>Math.round((Date.parse(a)-Date.parse(b))/864e5);
@@ -396,7 +398,7 @@ function errMsg(e){
 
 /* ---------- Estado ---------- */
 const S={sesion:null,perfil:null,personas:[],tarjetas:[],meses:[],mes:null,mesInfo:null,periodos:[],tx:[],rep:{},descuentos:[],memoria:{},accesos:[],bitacora:[],actualizado:null};
-const ui={view:"assign",entrada:new URLSearchParams(location.search).has("registro")?"registro":"login",aviso:"",cursor:0,split:null,files:[],toast:null,lock:{},lockFor:null,confirm:null,codigo:null,copyFall:null,busy:false};
+const ui={view:"assign",entrada:RECUPERANDO?"nueva":new URLSearchParams(location.search).has("registro")?"registro":"login",recuperando:RECUPERANDO,aviso:"",avisoOk:"",cursor:0,split:null,files:[],toast:null,lock:{},lockFor:null,confirm:null,codigo:null,copyFall:null,busy:false};
 const esAdmin=()=>S.perfil&&S.perfil.rol==="administrador";
 const cerrado=()=>S.mesInfo&&S.mesInfo.estado==="cerrado";
 const tc=()=>+(S.mesInfo&&S.mesInfo.tipo_cambio)||460;
@@ -518,21 +520,27 @@ async function accion(fn,okMsg){
 }
 function setEstado(t){const el=document.getElementById("estado");if(!el)return;el.textContent=t||(S.actualizado?`Actualizado ${S.actualizado.toLocaleTimeString("es-CR",{hour:"2-digit",minute:"2-digit"})}`:"");}
 
-/* ---------- Entrada: login y registro con código ---------- */
+/* ---------- Entrada: login, registro con código y contraseña olvidada ---------- */
 function viewEntrada(){
-  const reg=ui.entrada==="registro";
-  return `<section class="panel entrada"><div><h2>${reg?"Creá tu contraseña":"Entrar"}</h2>
-    <p class="small muted">${reg?"Usá el correo y el código de un solo uso que te pasó el administrador.":"Entrá con tu correo y tu contraseña."}</p></div>
-    <form class="stack" id="${reg?"form-registro":"form-login"}">
-      <label class="campo" for="correo">Correo<input id="correo" type="email" autocomplete="username" required></label>
-      ${reg?`<label class="campo" for="codigo">Código<input id="codigo" type="text" autocomplete="one-time-code" required style="text-transform:uppercase"></label>`:""}
-      <label class="campo" for="clave">Contraseña<input id="clave" type="password" autocomplete="${reg?"new-password":"current-password"}" required ${reg?'minlength="8"':""}></label>
-      ${reg?`<label class="campo" for="clave2">Repetí la contraseña<input id="clave2" type="password" autocomplete="new-password" required minlength="8"></label>`:""}
-      <button class="primary" id="btn-entrar">${reg?"Crear mi contraseña":"Entrar"}</button>
-    </form>
-    ${ui.aviso?`<p class="small note-err" role="alert">${h(ui.aviso)}</p>`:""}
-    <button class="link small" data-act="entrada" data-v="${reg?"login":"registro"}" style="justify-self:start">${reg?"Ya tengo contraseña: entrar":"Tengo un código: crear mi contraseña"}</button>
-  </section>`;
+  const modo=ui.entrada;
+  const correo=`<label class="campo" for="correo">Correo<input id="correo" type="email" autocomplete="username" required></label>`;
+  const nuevas=`<label class="campo" for="clave">Contraseña nueva<input id="clave" type="password" autocomplete="new-password" required minlength="8"></label>
+      <label class="campo" for="clave2">Repetí la contraseña<input id="clave2" type="password" autocomplete="new-password" required minlength="8"></label>`;
+  const link=(v,t)=>`<button class="link small" data-act="entrada" data-v="${v}" style="justify-self:start">${t}</button>`;
+  const pie=`${ui.aviso?`<p class="small note-err" role="alert">${h(ui.aviso)}</p>`:""}${ui.avisoOk?`<p class="small" role="status"><strong>${h(ui.avisoOk)}</strong></p>`:""}`;
+  const caja=(titulo,texto,form,links)=>`<section class="panel entrada"><div><h2>${titulo}</h2><p class="small muted">${texto}</p></div>${form}${pie}<div class="stack" style="gap:4px">${links}</div></section>`;
+  if(modo==="registro")return caja("Creá tu contraseña","Usá el correo y el código de un solo uso que te pasó el administrador.",
+    `<form class="stack" id="form-registro">${correo}<label class="campo" for="codigo">Código<input id="codigo" type="text" autocomplete="one-time-code" required style="text-transform:uppercase"></label>${nuevas}<button class="primary" id="btn-entrar">Crear mi contraseña</button></form>`,
+    link("login","Ya tengo contraseña: entrar"));
+  if(modo==="olvido")return caja("Olvidé mi contraseña","Escribí tu correo y te mandamos un enlace para elegir una contraseña nueva. Puede tardar unos minutos; revisá también el correo no deseado.",
+    `<form class="stack" id="form-olvido">${correo}<button class="primary" id="btn-entrar">Mandarme el enlace</button></form>`,
+    link("login","Volver a entrar"));
+  if(modo==="nueva")return caja("Elegí tu contraseña nueva","Con esta vas a entrar de ahora en adelante.",
+    `<form class="stack" id="form-nueva">${nuevas}<button class="primary" id="btn-entrar">Guardar y entrar</button></form>`,
+    link("olvido","El enlace no funcionó: pedir otro"));
+  return caja("Entrar","Entrá con tu correo y tu contraseña.",
+    `<form class="stack" id="form-login">${correo}<label class="campo" for="clave">Contraseña<input id="clave" type="password" autocomplete="current-password" required></label><button class="primary" id="btn-entrar">Entrar</button></form>`,
+    link("olvido","Olvidé mi contraseña")+link("registro","Tengo un código: crear mi contraseña"));
 }
 async function entrar(sesion){
   S.sesion=sesion;
@@ -564,7 +572,7 @@ function tabs(){
 function render(){
   const a=document.activeElement,aid=a&&a.id;
   const app=document.getElementById("app");
-  if(!S.sesion){app.innerHTML=`<header class="top"><h1>Finanzas</h1></header>`+viewEntrada();renderToast();return;}
+  if(!S.sesion||ui.recuperando){app.innerHTML=`<header class="top"><h1>Finanzas</h1></header>`+viewEntrada();renderToast();return;}
   const q_=cola(),left=q_.filter(t=>!asignada(t)).length;
   const meses=[...new Set([S.mes,...S.meses.map(m=>m.mes)])].sort().reverse();
   app.innerHTML=`<header class="top"><h1>Finanzas</h1>
@@ -1014,7 +1022,7 @@ function viewLog(){
 /* ---------- Acciones ---------- */
 const acts={
   go:async v=>{ui.view=v;ui.split=null;ui.confirm=null;ui.copyFall=null;if(v==="log"){try{S.bitacora=await q(sb.from("bitacora").select("*").order("id",{ascending:false}).limit(150));}catch(e){toast(errMsg(e));}}render();window.scrollTo(0,0);},
-  entrada:v=>{ui.entrada=v;ui.aviso="";render();},
+  entrada:v=>{ui.entrada=v;ui.aviso="";ui.avisoOk="";if(v!=="nueva")ui.recuperando=false;render();},
   salir:async()=>{await sb.auth.signOut();},
   undo:()=>{const u=ui.toast&&ui.toast.undo;ui.toast=null;renderToast();if(u)u();},
   reabrir:()=>accion(()=>q(sb.rpc("reabrir_mes",{p_mes:S.mes})),"Mes reabierto."),
@@ -1055,6 +1063,31 @@ const acts={
 document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b||b.disabled)return;const fn=acts[b.dataset.act];if(fn)fn(b.dataset.v);});
 document.addEventListener("submit",async e=>{
   const f=e.target;e.preventDefault();
+  if(f.id==="form-olvido"){
+    ui.aviso="";ui.avisoOk="";const btn=document.getElementById("btn-entrar");btn.disabled=true;
+    const correo=document.getElementById("correo").value.trim().toLowerCase();
+    const {error}=await sb.auth.resetPasswordForEmail(correo,{redirectTo:location.origin+location.pathname});
+    btn.disabled=false;
+    /* La respuesta es la misma exista o no la cuenta, para no revelar qué correos están registrados. */
+    if(error&&/rate limit|too many|seconds/i.test(error.message))ui.aviso="Ya se mandaron varios correos seguidos. Esperá unos minutos y volvé a pedirlo.";
+    else if(error&&/fetch|network/i.test(error.message))ui.aviso=errMsg(error);
+    else ui.avisoOk="Si ese correo tiene cuenta, te llegó un enlace. Abrilo en este mismo dispositivo.";
+    render();return;
+  }
+  if(f.id==="form-nueva"){
+    ui.aviso="";const btn=document.getElementById("btn-entrar");
+    const clave=document.getElementById("clave").value,clave2=document.getElementById("clave2").value;
+    if(clave!==clave2){ui.aviso="Las dos contraseñas no son iguales.";render();return;}
+    btn.disabled=true;
+    const {error}=await sb.auth.updateUser({password:clave});
+    btn.disabled=false;
+    if(error){ui.aviso=/session|jwt|expired|missing/i.test(error.message)?"El enlace venció o ya se usó. Pedí uno nuevo.":mensajeRegistro(error);render();return;}
+    ui.recuperando=false;ui.entrada="login";
+    history.replaceState(null,"",location.pathname);
+    const {data}=await sb.auth.getSession();
+    if(data.session){toast("Contraseña cambiada.");return entrar(data.session);}
+    ui.avisoOk="Contraseña cambiada. Ya podés entrar.";render();return;
+  }
   if(f.id==="form-login"||f.id==="form-registro"){
     ui.aviso="";const btn=document.getElementById("btn-entrar");btn.disabled=true;
     const correo=document.getElementById("correo").value.trim().toLowerCase(),clave=document.getElementById("clave").value;
@@ -1163,12 +1196,14 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
 
 /* ---------- Inicio ---------- */
 sb.auth.onAuthStateChange((evento,sesion)=>{
+  if(evento==="PASSWORD_RECOVERY"){ui.recuperando=true;ui.entrada="nueva";ui.aviso="";render();return;}
   if(evento==="SIGNED_OUT"){Object.assign(S,{sesion:null,perfil:null});ui.view="assign";render();}
-  else if(sesion)S.sesion=sesion;
+  else if(sesion&&!ui.recuperando)S.sesion=sesion;
 });
 (async()=>{
   render();
   const {data}=await sb.auth.getSession();
+  if(ui.recuperando){render();return;}
   if(data.session&&!new URLSearchParams(location.search).has("registro"))await entrar(data.session);
   else render();
 })();
