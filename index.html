@@ -423,7 +423,9 @@ const personasActivas=()=>S.personas.filter(p=>p.activa);
 const yo=()=>S.perfil&&S.perfil.persona_id!=null?String(S.perfil.persona_id):null;
 const asignables=()=>esAdmin()?personasActivas():personasActivas().filter(p=>String(p.id)===yo());
 const compartida=t=>asignada(t)&&t.modo!=="full";
-const ajena=t=>!esAdmin()&&asignada(t)&&(compartida(t)||Object.keys(montos(t))[0]!==yo());
+/* La usuaria cambia solo lo que asignó ella; lo que asignó el administrador queda fijo para ella. */
+const deAdmin=t=>asignada(t)&&t.repPor!==S.sesion.user.id;
+const ajena=t=>!esAdmin()&&asignada(t)&&(compartida(t)||Object.keys(montos(t))[0]!==yo()||deAdmin(t));
 const personName=id=>(S.personas.find(p=>String(p.id)===String(id))||{nombre:"Sin persona"}).nombre;
 const colorOf=id=>{const i=S.personas.findIndex(p=>String(p.id)===String(id));return `var(--p${((i<0?0:i)%8)+1})`;};
 const mesLabel=m=>monthLabel(m)||"Sin mes";
@@ -436,7 +438,7 @@ function mesDePago(fecha,card){
 
 function mapTx(r){
   return {id:r.id,mes:r.mes,card:r.tarjeta,stmt:r.periodo_id,date:r.fecha||"",desc:r.comercio,amt:+r.monto,cur:r.moneda,kind:r.tipo,origen:r.origen,estado:r.estado,
-    plastic:r.plastico,holder:r.titular,key:r.clave_comercio,conc:r.conciliada_con,modo:r.reparto_modo,regBy:r.registrado_por};
+    plastic:r.plastico,holder:r.titular,key:r.clave_comercio,conc:r.conciliada_con,modo:r.reparto_modo,regBy:r.registrado_por,repPor:r.reparto_por};
 }
 const periodoDe=card=>S.periodos.find(p=>p.tarjeta===card);
 const periodoConfirmado=card=>{const p=periodoDe(card);return !!(p&&p.confirmado);};
@@ -786,7 +788,7 @@ function viewAssign(){
       <div class="act">
         <div class="people">${buttons}</div>
         <div class="row between">
-          ${esAdmin()?`<button data-act="splitOpen" ${ro?"disabled":""} ${ui.split?'aria-expanded="true"':""}>Repartir <kbd class="k">R</kbd></button>`:asignada(t)&&!ajena(t)&&!cerrado()?`<button data-act="soltar" data-v="${t.id}">No es mía</button>`:compartida(t)?'<span class="small muted">Compartida: la cambia el administrador</span>':"<span></span>"}
+          ${esAdmin()?`<button data-act="splitOpen" ${ro?"disabled":""} ${ui.split?'aria-expanded="true"':""}>Repartir <kbd class="k">R</kbd></button>`:asignada(t)&&!ajena(t)&&!cerrado()?`<button data-act="soltar" data-v="${t.id}">No es mía</button>`:compartida(t)?'<span class="small muted">Compartida: la cambia el administrador</span>':asignada(t)?'<span class="small muted">La asignó el administrador: solo él la cambia</span>':"<span></span>"}
           <span class="row"><button data-act="prev" ${i===0?"disabled":""}>Anterior</button><button data-act="next" ${i>=list.length-1?"disabled":""}>Saltar</button></span>
         </div>
         ${sug?`<div class="sugbar"><span class="small"><strong>${h(sug.why)}:</strong> ${h(allocPreview(t,sug.alloc))}</span><button class="small primary" data-act="acceptSug">Aceptar <kbd class="k">Enter</kbd></button></div>`:""}
@@ -865,7 +867,7 @@ async function asignar(t,alloc){
   try{
     const r=await q(sb.rpc("guardar_reparto",{p_tx:t.id,p_modo:alloc.mode,p_pesos:alloc.parts}));
     S.rep[t.id]=Object.fromEntries(Object.entries(alloc.parts).filter(([,w])=>+w>0).map(([k,w])=>[k,{peso:+w,monto:+(r&&r[k]||0)}]));
-    t.modo=alloc.mode;
+    t.modo=alloc.mode;t.repPor=S.sesion.user.id;
     if(t.key&&!/^IVA/.test(t.key))S.memoria[t.key]={mode:alloc.mode,parts:alloc.parts};
     ui.split=null;ui.lock[t.id]="";ui.lockFor=null;
     const full=cola(),i=full.indexOf(t);
