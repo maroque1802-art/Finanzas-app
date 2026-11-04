@@ -382,7 +382,7 @@ const RECUPERANDO=/type=recovery/.test(location.hash);
 const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
 const todayIso=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
 const daysBetween=(a,b)=>Math.round((Date.parse(a)-Date.parse(b))/864e5);
-const LS_MES="finanzas-mes",LS_RECHAZOS="finanzas-rechazos";
+const LS_MES="finanzas-mes",LS_RECHAZOS="finanzas-rechazos",LS_PEND="finanzas-solo-pendientes";
 const lsGet=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
 
@@ -398,7 +398,7 @@ function errMsg(e){
 
 /* ---------- Estado ---------- */
 const S={sesion:null,perfil:null,personas:[],tarjetas:[],meses:[],mes:null,mesInfo:null,periodos:[],tx:[],rep:{},descuentos:[],memoria:{},accesos:[],bitacora:[],actualizado:null};
-const ui={view:"assign",entrada:RECUPERANDO?"nueva":new URLSearchParams(location.search).has("registro")?"registro":"login",recuperando:RECUPERANDO,aviso:"",avisoOk:"",cursor:0,split:null,files:[],toast:null,lock:{},lockFor:null,confirm:null,codigo:null,copyFall:null,busy:false};
+const ui={soloPend:lsGet(LS_PEND)!=="0",view:"assign",entrada:RECUPERANDO?"nueva":new URLSearchParams(location.search).has("registro")?"registro":"login",recuperando:RECUPERANDO,aviso:"",avisoOk:"",cursor:0,split:null,files:[],toast:null,lock:{},lockFor:null,confirm:null,codigo:null,copyFall:null,busy:false};
 const esAdmin=()=>S.perfil&&S.perfil.rol==="administrador";
 const cerrado=()=>S.mesInfo&&S.mesInfo.estado==="cerrado";
 const tc=()=>+(S.mesInfo&&S.mesInfo.tipo_cambio)||460;
@@ -430,6 +430,8 @@ const ordCard=c=>{const i=CARDS.findIndex(x=>x.id===c);return i<0?9:i;};
 function cola(){
   return S.tx.filter(cuenta).sort((a,b)=>ordCard(a.card)-ordCard(b.card)||(a.origen===b.origen?0:a.origen==="pdf"?-1:1)||(orden[a.kind]-orden[b.kind])||(a.date<b.date?-1:a.date>b.date?1:0)||a.id-b.id);
 }
+/* Lo que recorre la pantalla Asignar: solo las pendientes, o todas si se pide. */
+function lista(){const l=cola();return ui.soloPend?l.filter(t=>!asignada(t)):l;}
 /* Mismo algoritmo que repartir_monto() en Postgres: colones enteros, el residuo a la primera persona. */
 function repartir(total,parts){
   const ids=S.personas.map(p=>String(p.id)).filter(id=>+parts[id]>0),sum=ids.reduce((s,k)=>s+ +parts[k],0),out={};
@@ -715,13 +717,15 @@ function tomar(t){
   sb.rpc("tomar_transaccion",{p_tx:t.id}).then(({data})=>{ui.lock[t.id]=data||"";if(data&&ui.view==="assign")render();},()=>{});
 }
 function viewAssign(){
-  const list=cola();
+  const all=cola(),list=lista(),pendN=all.filter(x=>!asignada(x)).length;
+  const filtro=`<div class="row between"><div class="seg" role="group" aria-label="Qué líneas mostrar"><button data-act="pendMode" data-v="1" class="${ui.soloPend?"on":""}" ${ui.soloPend?'aria-pressed="true"':'aria-pressed="false"'}>Pendientes (${pendN})</button><button data-act="pendMode" data-v="0" class="${ui.soloPend?"":"on"}" ${ui.soloPend?'aria-pressed="false"':'aria-pressed="true"'}>Todas (${all.length})</button></div></div>`;
+  if(all.length&&!list.length)return `<div class="stack">${filtro}<section class="panel"><h2>Todas las líneas están asignadas</h2><p class="muted">No queda nada pendiente en el pago de ${h(mesLabel(S.mes))}. Para revisar o cambiar alguna, tocá <strong>Todas</strong>.</p><div class="row"><button class="primary" data-act="go" data-v="result">Ver el resultado</button><button data-act="pendMode" data-v="0">Ver todas</button></div></section></div>`;
   if(!list.length)return `<section class="panel"><h2>No hay nada para asignar en el pago de ${h(mesLabel(S.mes))}</h2><p class="muted">${esAdmin()?"Cargá y confirmá los estados de cuenta, o registrá un gasto.":"Cuando el administrador confirme los estados de cuenta, las líneas aparecen aquí. Mientras tanto podés registrar gastos."}</p><div class="row">${esAdmin()?'<button class="primary" data-act="go" data-v="load">Ir a Cargar</button>':""}<button data-act="go" data-v="exp">Registrar un gasto</button></div></section>`;
   ui.cursor=Math.min(Math.max(0,ui.cursor),list.length-1);
-  const i=ui.cursor,t=list[i],left=list.filter(x=>!asignada(x)).length,done=list.length-left;
+  const i=ui.cursor,t=list[i],left=pendN,done=all.length-left,ai=all.indexOf(t);
   tomar(t);
   const otro=ui.lock[t.id],ro=cerrado()||!!otro;
-  const sug=asignada(t)||ro?null:suggestion(t,list,i);
+  const sug=asignada(t)||ro?null:suggestion(t,all,ai);
   const cur=asignada(t)&&t.modo==="full"?Object.keys(montos(t))[0]:null;
   const sugFull=sug&&sug.alloc.mode==="full"?Object.keys(sug.alloc.parts)[0]:null;
   const act=personasActivas();
@@ -729,11 +733,12 @@ function viewAssign(){
   const T=totales();
   const next=[];for(let k=1;k<list.length&&next.length<5;k++){const j=(i+k)%list.length;if(!asignada(list[j]))next.push(j);}
   return `<div class="assign"><div class="stack">
+    ${filtro}
     ${left===0?`<div class="sugbar"><strong>Todas las líneas están asignadas.</strong><button class="primary small" data-act="go" data-v="result">Ver el resultado</button></div>`:""}
     ${otro?`<div class="banner"><span><strong>En revisión por ${h(otro)}.</strong> Para no pisarse, seguí con otra.</span><button data-act="nextFree">Ir a la siguiente libre</button></div>`:""}
     <article class="ticket">
-      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${list.length}" aria-valuenow="${done}"><i style="width:${done/list.length*100}%"></i></div>
-      <div class="head"><strong class="num">${i+1} de ${list.length}</strong><span class="row small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Registrado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}<span class="muted">${left} sin asignar</span></span></div>
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${all.length}" aria-valuenow="${done}"><i style="width:${done/all.length*100}%"></i></div>
+      <div class="head"><strong class="num">${i+1} de ${list.length}${ui.soloPend?" pendientes":""}</strong><span class="row small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Registrado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}${ui.soloPend?"":`<span class="muted">${left} sin asignar</span>`}</span></div>
       <div class="body">
         <span class="muted">${showDate(t.date)}</span>
         <div class="merchant">${h(t.desc)}</div>
@@ -762,7 +767,7 @@ function viewAssign(){
     </aside></div>`;
 }
 function openSplit(t){
-  const base=asignada(t)?{mode:t.modo,parts:pesos(t)}:(suggestion(t,cola(),ui.cursor)||{}).alloc;
+  const base=asignada(t)?{mode:t.modo,parts:pesos(t)}:(suggestion(t,cola(),cola().indexOf(t))||{}).alloc;
   const checked={},values={};
   if(base)for(const [id,w] of Object.entries(base.parts)){checked[id]=true;values[id]=base.mode==="pct"?String(w).replace(".",","):base.mode==="amount"?group(+w,t.cur==="USD"||Math.round(+w*100)%100>0):"";}
   ui.split={mode:base&&(base.mode==="amount"||base.mode==="pct")?base.mode:"equal",checked,values};
@@ -821,12 +826,12 @@ async function asignar(t,alloc){
     t.modo=alloc.mode;
     if(t.key&&!/^IVA/.test(t.key))S.memoria[t.key]={mode:alloc.mode,parts:alloc.parts};
     ui.split=null;ui.lock[t.id]="";ui.lockFor=null;
-    const list=cola(),i=list.indexOf(t);
-    let nx=-1;for(let k=1;k<=list.length;k++){const j=(i+k)%list.length;if(!asignada(list[j])&&!ui.lock[list[j].id]){nx=j;break;}}
-    ui.cursor=nx<0?i:nx;
+    const full=cola(),i=full.indexOf(t);
+    let nx=null;for(let k=1;k<=full.length;k++){const c=full[(i+k)%full.length];if(!asignada(c)&&!ui.lock[c.id]){nx=c;break;}}
+    ui.cursor=Math.max(0,lista().indexOf(nx||t));
     toast(`${t.desc}: ${allocText(t)}`,async()=>{
       await accion(async()=>{if(prev)await q(sb.rpc("guardar_reparto",{p_tx:t.id,p_modo:prev.mode,p_pesos:prev.parts}));else await q(sb.rpc("borrar_reparto",{p_tx:t.id}));});
-      ui.cursor=cola().findIndex(x=>x.id===t.id);render();
+      ui.cursor=Math.max(0,lista().findIndex(x=>x.id===t.id));render();
     });
   }catch(e){toast(errMsg(e));}
   finally{ui.busy=false;render();}
@@ -1034,17 +1039,18 @@ const acts={
   addRow:v=>{const p=S.periodos.find(x=>x.id===+v);accion(()=>q(sb.from("transacciones").insert({periodo_id:p.id,mes:p.mes,tarjeta:p.tarjeta,fecha:p.corte,comercio:"Nueva línea",monto:0,origen:"pdf",estado:p.confirmado?"confirmada":"borrador",huella:`manual|${Date.now()}`})));},
   delRow:v=>accion(()=>q(sb.from("transacciones").delete().eq("id",+v)),"Línea borrada."),
   adjust:v=>{const p=S.periodos.find(x=>x.id===+v),r=cuadre(p);accion(async()=>{for(const cur of ["CRC","USD"]){const d=r.diff[cur];if(d!=null&&Math.abs(d)>=.01)await q(sb.from("transacciones").insert({periodo_id:p.id,mes:p.mes,tarjeta:p.tarjeta,fecha:p.corte,comercio:"Ajuste para cuadrar con el estado",monto:d,moneda:cur,tipo:"saldo",origen:"pdf",estado:p.confirmado?"confirmada":"borrador",huella:`ajuste|${cur}|${Date.now()}`}));}});},
-  assign:v=>{const t=cola()[ui.cursor];if(t)asignar(t,{mode:"full",parts:{[v]:1}});},
-  acceptSug:()=>{const list=cola(),t=list[ui.cursor],s=t&&suggestion(t,list,ui.cursor);if(s&&!ui.lock[t.id])asignar(t,s.alloc);},
+  pendMode:v=>{const cur=lista()[ui.cursor];ui.soloPend=v==="1";lsSet(LS_PEND,ui.soloPend?"1":"0");const l=lista();let j=cur?l.indexOf(cur):-1;if(j<0&&cur){const full=cola(),ci=full.indexOf(cur);for(let k=1;k<=full.length;k++){j=l.indexOf(full[(ci+k)%full.length]);if(j>=0)break;}}ui.cursor=Math.max(0,j);ui.split=null;render();},
+  assign:v=>{const t=lista()[ui.cursor];if(t)asignar(t,{mode:"full",parts:{[v]:1}});},
+  acceptSug:()=>{const t=lista()[ui.cursor],all=cola(),s=t&&suggestion(t,all,all.indexOf(t));if(s&&!ui.lock[t.id])asignar(t,s.alloc);},
   prev:()=>{ui.cursor=Math.max(0,ui.cursor-1);ui.split=null;render();},
-  next:()=>{ui.cursor=Math.min(cola().length-1,ui.cursor+1);ui.split=null;render();},
-  nextFree:()=>{const list=cola();for(let k=1;k<=list.length;k++){const j=(ui.cursor+k)%list.length;if(!asignada(list[j])&&!ui.lock[list[j].id]){ui.cursor=j;break;}}ui.split=null;render();},
+  next:()=>{ui.cursor=Math.min(lista().length-1,ui.cursor+1);ui.split=null;render();},
+  nextFree:()=>{const list=lista();for(let k=1;k<=list.length;k++){const j=(ui.cursor+k)%list.length;if(!asignada(list[j])&&!ui.lock[list[j].id]){ui.cursor=j;break;}}ui.split=null;render();},
   jump:v=>{ui.cursor=+v;ui.split=null;render();},
-  splitOpen:()=>{const t=cola()[ui.cursor];if(!t||ui.lock[t.id]||cerrado())return;if(ui.split)ui.split=null;else openSplit(t);render();},
+  splitOpen:()=>{const t=lista()[ui.cursor];if(!t||ui.lock[t.id]||cerrado())return;if(ui.split)ui.split=null;else openSplit(t);render();},
   splitClose:()=>{ui.split=null;render();},
   splitMode:v=>{ui.split.mode=v;if(v!=="equal"&&ui.split.lastMode!==v)ui.split.values={};ui.split.lastMode=v;render();},
-  splitRest:v=>{const t=cola()[ui.cursor],sp=ui.split,goal=sp.mode==="pct"?100:Math.abs(t.amt);const rest=round2(goal-personasActivas().reduce((s,p)=>s+(parseMoney(sp.values[p.id])||0),0));if(rest>0)sp.values[v]=sp.mode==="pct"?String(rest).replace(".",","):group(rest,t.cur==="USD"||Math.round(rest*100)%100>0);render();},
-  splitApply:()=>{const t=cola()[ui.cursor],e=splitEval(t);if(e.ok)asignar(t,{mode:ui.split.mode,parts:e.parts});},
+  splitRest:v=>{const t=lista()[ui.cursor],sp=ui.split,goal=sp.mode==="pct"?100:Math.abs(t.amt);const rest=round2(goal-personasActivas().reduce((s,p)=>s+(parseMoney(sp.values[p.id])||0),0));if(rest>0)sp.values[v]=sp.mode==="pct"?String(rest).replace(".",","):group(rest,t.cur==="USD"||Math.round(rest*100)%100>0);render();},
+  splitApply:()=>{const t=lista()[ui.cursor],e=splitEval(t);if(e.ok)asignar(t,{mode:ui.split.mode,parts:e.parts});},
   expDel:v=>accion(()=>q(sb.from("transacciones").delete().eq("id",+v)),"Gasto borrado."),
   expConfirm:v=>{const [g,t]=v.split(":").map(Number);accion(()=>q(sb.rpc("conciliar",{p_manual:g,p_pdf:t})),"Gasto conciliado con el estado.");},
   expReject:v=>{const [g,t]=v.split(":").map(Number);const s=rechazos();s.add(`${g}:${t}`);lsSet(LS_RECHAZOS,JSON.stringify([...s]));const x=S.tx.find(y=>y.id===g);if(x&&x.conc===t)accion(()=>q(sb.rpc("desconciliar",{p_manual:g})));else render();},
@@ -1118,7 +1124,7 @@ document.addEventListener("change",async e=>{
   if(el.id==="mesSel"){S.mes=el.value;lsSet(LS_MES,S.mes);ui.cursor=0;ui.split=null;ui.copiandoDesc=false;await recargar();render();return;}
   if(el.id==="tcInput"){const n=parseMoney(el.value);if(n>0)accion(()=>q(sb.from("meses").upsert({mes:S.mes,tipo_cambio:n})),"Tipo de cambio actualizado; los repartos en dólares se recalcularon.");else render();return;}
   if(el.id==="expDate"||el.id==="expCard"||el.id==="expCur"){ui.exp=ui.exp||{};ui.exp[el.id==="expDate"?"date":el.id==="expCard"?"card":"cur"]=el.value;const hint=document.getElementById("expHint");if(hint)hint.textContent=expHint();return;}
-  if(el.dataset.splitc){ui.split.checked[el.dataset.splitc]=el.checked;refreshSplit(cola()[ui.cursor]);return;}
+  if(el.dataset.splitc){ui.split.checked[el.dataset.splitc]=el.checked;refreshSplit(lista()[ui.cursor]);return;}
   if(el.dataset.tx){
     const f=el.dataset.tx,id=+el.dataset.id;let v=el.value;
     if(f==="monto"){v=parseMoney(v);if(v==null){toast("Ese monto no se entiende.");return;}}
@@ -1152,10 +1158,10 @@ document.addEventListener("change",async e=>{
     accion(()=>q(sb.from("personas").update({[f]:v}).eq("id",id)));
   }
 });
-document.addEventListener("input",e=>{const el=e.target;if(el.dataset.split){ui.split.values[el.dataset.split]=el.value;refreshSplit(cola()[ui.cursor]);}});
+document.addEventListener("input",e=>{const el=e.target;if(el.dataset.split){ui.split.values[el.dataset.split]=el.value;refreshSplit(lista()[ui.cursor]);}});
 document.addEventListener("keydown",e=>{
   if(ui.view!=="assign"||!S.sesion||e.ctrlKey||e.metaKey||e.altKey)return;
-  const list=cola();if(!list.length)return;
+  const list=lista();if(!list.length)return;
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=="checkbox";
   if(e.key==="Escape"&&ui.split){ui.split=null;render();return;}
   if(e.key==="Enter"){if(e.target.tagName==="BUTTON"&&e.target.id!=="spGo")return;e.preventDefault();if(ui.split)acts.splitApply();else acts.acceptSug();return;}
