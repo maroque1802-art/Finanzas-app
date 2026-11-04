@@ -91,10 +91,19 @@ tfoot td{font-weight:700;border-bottom:0;border-top:2px solid var(--line)}
 .assign{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px;align-items:start}
 @media (max-width:860px){.assign{grid-template-columns:minmax(0,1fr)}}
 .ticket{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
-.ticket .head{padding:12px 20px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;background:var(--sunk)}
+.ticket .head{padding:12px 20px;display:grid;gap:6px;background:var(--sunk)}
+/* Alto fijo arriba de los botones: el encabezado y la descripción no cambian de tamaño entre una línea y otra. */
+.ticket .head .l1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.ticket .head .l2{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;overflow:hidden;min-width:0}
+.ticket .head .l2>*{flex:none;white-space:nowrap}
+.ticket .head .l2>.holder{flex:0 1 auto;min-width:3em;overflow:hidden;text-overflow:ellipsis}
 .progress{height:6px;background:var(--line)}.progress i{display:block;height:100%;background:var(--accent);transition:width .2s}
 .ticket .body{padding:24px 20px 20px;display:grid;gap:6px}
-.merchant{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,4.2vw,2.2rem);line-height:1.12;overflow-wrap:anywhere}
+.merchant{font-family:var(--display);font-weight:700;font-size:clamp(1.5rem,4.2vw,2.2rem);line-height:1.12;overflow-wrap:anywhere;height:2.24em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.tline{min-height:1.45em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tline.off{visibility:hidden}
+.astate{display:flex;flex-wrap:nowrap;gap:10px;align-items:center;margin-top:6px;min-height:1.75rem;min-width:0}
+.astate>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .amount{font-family:var(--mono);font-weight:500;font-size:clamp(2rem,6.4vw,3.3rem);letter-spacing:-.02em;line-height:1.15;overflow-wrap:anywhere}
 .amount.neg{color:var(--good)}
 .rip{border:0;border-top:2px dashed var(--line);margin:0}
@@ -738,22 +747,22 @@ function viewAssign(){
     ${otro?`<div class="banner"><span><strong>En revisión por ${h(otro)}.</strong> Para no pisarse, seguí con otra.</span><button data-act="nextFree">Ir a la siguiente libre</button></div>`:""}
     <article class="ticket">
       <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${all.length}" aria-valuenow="${done}"><i style="width:${done/all.length*100}%"></i></div>
-      <div class="head"><strong class="num">${i+1} de ${list.length}${ui.soloPend?" pendientes":""}</strong><span class="row small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Registrado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}${ui.soloPend?"":`<span class="muted">${left} sin asignar</span>`}</span></div>
+      <div class="head"><div class="l1"><strong class="num">${i+1} de ${list.length}${ui.soloPend?" pendientes":""}</strong>${ui.soloPend?"":`<span class="small muted">${left} sin asignar</span>`}</div><div class="l2 small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Registrado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain holder" title="${h(t.holder)}">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}</div></div>
       <div class="body">
         <span class="muted">${showDate(t.date)}</span>
-        <div class="merchant">${h(t.desc)}</div>
+        <div class="merchant" title="${h(t.desc)}">${h(t.desc)}</div>
         <div class="amount ${t.amt<0?"neg":""}">${money(t.amt,t.cur)}</div>
-        ${t.cur==="USD"?`<span class="muted num">${money(colones(t))} al tipo de cambio de ₡${h(String(tc()))}</span>`:""}
-        ${asignada(t)?`<div class="row small" style="margin-top:6px"><span class="pill good">Asignada</span><span>${h(allocText(t))}</span></div>`:""}
+        <span class="muted num small tline ${t.cur==="USD"?"":"off"}">${t.cur==="USD"?`${money(colones(t))} al tipo de cambio de ₡${h(String(tc()))}`:"&nbsp;"}</span>
+        <div class="astate small">${asignada(t)?`<span class="pill good">Asignada</span><span title="${h(allocText(t))}">${h(allocText(t))}</span>`:'<span class="pill plain">Sin asignar</span>'}</div>
       </div>
       <hr class="rip">
       <div class="act">
-        ${sug?`<div class="sugbar"><span class="small"><strong>${h(sug.why)}:</strong> ${h(allocPreview(t,sug.alloc))}</span><button class="small primary" data-act="acceptSug">Aceptar <kbd class="k">Enter</kbd></button></div>`:""}
         <div class="people">${buttons}</div>
         <div class="row between">
           <button data-act="splitOpen" ${ro?"disabled":""} ${ui.split?'aria-expanded="true"':""}>Repartir <kbd class="k">R</kbd></button>
           <span class="row"><button data-act="prev" ${i===0?"disabled":""}>Anterior</button><button data-act="next" ${i>=list.length-1?"disabled":""}>Saltar</button></span>
         </div>
+        ${sug?`<div class="sugbar"><span class="small"><strong>${h(sug.why)}:</strong> ${h(allocPreview(t,sug.alloc))}</span><button class="small primary" data-act="acceptSug">Aceptar <kbd class="k">Enter</kbd></button></div>`:""}
         ${ui.split&&!ro?splitHtml(t):""}
         <div class="keys"><span><kbd class="k">1</kbd>–<kbd class="k">${Math.min(9,act.length)}</kbd> asigna el 100 %</span><span><kbd class="k">R</kbd> reparte</span><span><kbd class="k">←</kbd> <kbd class="k">→</kbd> navega</span><span><kbd class="k">Z</kbd> deshace</span></div>
       </div>
