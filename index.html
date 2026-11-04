@@ -137,6 +137,12 @@ kbd.k{font:500 .75rem var(--mono);border:1px solid var(--line);border-radius:4px
 .tally .trow:hover{background:var(--sunk)}
 .queue.pq{max-height:420px;overflow-y:auto}
 .queue button.on{background:var(--sunk);font-weight:700}
+.hero{background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:14px 18px;display:grid;gap:2px;min-width:0}
+.hero .lbl{font-size:.875rem;opacity:.85}
+.hero .big{font-family:var(--mono);font-weight:500;font-size:clamp(2rem,9vw,2.9rem);letter-spacing:-.02em;line-height:1.1;overflow-wrap:anywhere}
+.hero .sub{font-size:.8125rem;opacity:.85}
+.hero .tot .sub{font-family:var(--body)}.hero .tot strong{font-size:1.125rem}
+.hero .tot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;border-top:1px solid color-mix(in srgb,currentColor 30%,transparent);margin-top:8px;padding-top:8px;font-size:.9375rem}
 .keys{color:var(--muted);font-size:.8125rem;display:flex;flex-wrap:wrap;gap:4px 12px}
 /* Gastos */
 .expform{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
@@ -612,12 +618,28 @@ function render(){
       <span class="small">${h(S.perfil.nombre||S.sesion.user.email)} <span class="muted">(${esAdmin()?"administrador":"usuaria"})</span></span>
       <button class="link small" data-act="salir">Salir</button>
     </div></header>
+    ${heroHtml()}
     <nav class="steps" aria-label="Secciones">${tabs().map(([k,l])=>`<button data-act="go" data-v="${k}" class="${ui.view===k?"on":""}" ${ui.view===k?'aria-current="page"':""}>${l}${k==="assign"&&q_.length?` <span class="small muted">(${q_.length-left}/${q_.length})</span>`:""}</button>`).join("")}</nav>
     ${cerrado()?`<div class="banner"><span>Este mes está cerrado: solo se puede ver.</span>${esAdmin()?'<button data-act="reabrir">Reabrir el mes</button>':""}</div>`:""}
     <main id="view">${({load:viewLoad,review:viewReview,assign:viewAssign,exp:viewExpenses,result:viewResult,people:viewPeople,access:viewAccess,log:viewLog}[ui.view]||viewAssign)()}</main>`;
   setEstado();
   if(aid){const el=document.getElementById(aid);if(el)el.focus();}
   renderToast();
+}
+/* Control del gasto: lo que lleva anotado quien abre la app, siempre a la vista. El administrador ve además el total del pago. */
+function heroHtml(){
+  const id=yo();if(!id||!S.personas.some(p=>String(p.id)===id))return "";
+  const T=totales(),d=T.per[id]||{total:0,disc:0};
+  const fut={};for(const t of S.tx)if(t.origen==="manual"&&t.mes>S.mes&&!t.conc){const m=montos(t)[id];if(m)fut[t.mes]=(fut[t.mes]||0)+m;}
+  const futTxt=Object.keys(fut).sort().map(m=>`${money(fut[m])} para el pago de ${h(mesLabel(m))}`).join(" · ");
+  const pend=cola().filter(t=>!asignada(t)).length;
+  return `<section class="hero" aria-label="Lo que llevás anotado">
+    <span class="lbl">Llevás anotado · pago de ${h(mesLabel(S.mes))}</span>
+    <span class="big num">${money(d.total)}</span>
+    <span class="sub">${d.disc?`Con descuentos, debés poner <strong class="num">${money(d.total-d.disc)}</strong>`:"&nbsp;"}${futTxt?`${d.disc?" · ":""}Además ${futTxt}`:""}</span>
+    ${esAdmin()?`<div class="tot"><span>Total del pago</span><span class="num"><strong>${money(T.all)}</strong>${T.none?` <span class="sub">· sin asignar ${money(T.none)}</span>`:""}</span></div>`
+      :pend?`<div class="tot"><span>${pend===1?"1 línea sin asignar":`${pend} líneas sin asignar`}</span><button class="link small" data-act="go" data-v="assign" style="color:inherit">Revisar</button></div>`:""}
+  </section>`;
 }
 function renderToast(){
   const s=document.getElementById("toastSlot");
