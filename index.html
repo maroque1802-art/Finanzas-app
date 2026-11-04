@@ -130,6 +130,13 @@ kbd.k{font:500 .75rem var(--mono);border:1px solid var(--line);border-radius:4px
 .queue{display:grid;gap:2px;font-size:.875rem}
 .queue button{display:flex;justify-content:space-between;gap:8px;border:0;background:none;padding:4px 6px;text-align:left;border-radius:5px;min-width:0}
 .queue button:hover{background:var(--sunk)}.queue span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip{--c:var(--p1);display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:4px 11px;font-size:.875rem}
+.chip.on{background:var(--c);border-color:var(--c);color:var(--surface);font-weight:700}.chip.on .dot{background:var(--surface)}
+.chip .dot{background:var(--c)}
+.tally .trow{display:flex;justify-content:space-between;gap:8px;align-items:center;border:0;background:none;padding:2px 4px;margin:0 -4px;border-radius:5px;text-align:left;width:calc(100% + 8px)}
+.tally .trow:hover{background:var(--sunk)}
+.queue.pq{max-height:420px;overflow-y:auto}
+.queue button.on{background:var(--sunk);font-weight:700}
 .keys{color:var(--muted);font-size:.8125rem;display:flex;flex-wrap:wrap;gap:4px 12px}
 /* Gastos */
 .expform{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
@@ -407,7 +414,7 @@ function errMsg(e){
 
 /* ---------- Estado ---------- */
 const S={sesion:null,perfil:null,personas:[],tarjetas:[],meses:[],mes:null,mesInfo:null,periodos:[],tx:[],rep:{},descuentos:[],memoria:{},accesos:[],bitacora:[],actualizado:null};
-const ui={soloPend:lsGet(LS_PEND)!=="0",view:"assign",entrada:RECUPERANDO?"nueva":new URLSearchParams(location.search).has("registro")?"registro":"login",recuperando:RECUPERANDO,aviso:"",avisoOk:"",cursor:0,split:null,files:[],toast:null,lock:{},lockFor:null,confirm:null,codigo:null,copyFall:null,busy:false};
+const ui={filtro:(v=>v==="0"?"todas":v&&v.startsWith("p:")?v:"pend")(lsGet(LS_PEND)),view:"assign",entrada:RECUPERANDO?"nueva":new URLSearchParams(location.search).has("registro")?"registro":"login",recuperando:RECUPERANDO,aviso:"",avisoOk:"",cursor:0,split:null,files:[],toast:null,lock:{},lockFor:null,confirm:null,codigo:null,copyFall:null,busy:false};
 const esAdmin=()=>S.perfil&&S.perfil.rol==="administrador";
 const cerrado=()=>S.mesInfo&&S.mesInfo.estado==="cerrado";
 const tc=()=>+(S.mesInfo&&S.mesInfo.tipo_cambio)||460;
@@ -440,7 +447,10 @@ function cola(){
   return S.tx.filter(cuenta).sort((a,b)=>ordCard(a.card)-ordCard(b.card)||(a.origen===b.origen?0:a.origen==="pdf"?-1:1)||(orden[a.kind]-orden[b.kind])||(a.date<b.date?-1:a.date>b.date?1:0)||a.id-b.id);
 }
 /* Lo que recorre la pantalla Asignar: solo las pendientes, o todas si se pide. */
-function lista(){const l=cola();return ui.soloPend?l.filter(t=>!asignada(t)):l;}
+/* Filtro: "pend", "todas" o "p:<id de persona>" (lo que tiene asignado esa persona, aunque sea compartido). */
+const filtroPersona=()=>{if(!ui.filtro.startsWith("p:"))return null;const id=ui.filtro.slice(2);return S.personas.find(p=>String(p.id)===id)||null;};
+const dePersona=(t,id)=>!!(S.rep[t.id]&&S.rep[t.id][id]);
+function lista(){const l=cola();if(ui.filtro==="pend")return l.filter(t=>!asignada(t));const p=filtroPersona();return p?l.filter(t=>dePersona(t,String(p.id))):l;}
 /* Mismo algoritmo que repartir_monto() en Postgres: colones enteros, el residuo a la primera persona. */
 function repartir(total,parts){
   const ids=S.personas.map(p=>String(p.id)).filter(id=>+parts[id]>0),sum=ids.reduce((s,k)=>s+ +parts[k],0),out={};
@@ -727,8 +737,13 @@ function tomar(t){
 }
 function viewAssign(){
   const all=cola(),list=lista(),pendN=all.filter(x=>!asignada(x)).length;
-  const filtro=`<div class="row between"><div class="seg" role="group" aria-label="Qué líneas mostrar"><button data-act="pendMode" data-v="1" class="${ui.soloPend?"on":""}" ${ui.soloPend?'aria-pressed="true"':'aria-pressed="false"'}>Pendientes (${pendN})</button><button data-act="pendMode" data-v="0" class="${ui.soloPend?"":"on"}" ${ui.soloPend?'aria-pressed="false"':'aria-pressed="true"'}>Todas (${all.length})</button></div></div>`;
-  if(all.length&&!list.length)return `<div class="stack">${filtro}<section class="panel"><h2>Todas las líneas están asignadas</h2><p class="muted">No queda nada pendiente en el pago de ${h(mesLabel(S.mes))}. Para revisar o cambiar alguna, tocá <strong>Todas</strong>.</p><div class="row"><button class="primary" data-act="go" data-v="result">Ver el resultado</button><button data-act="pendMode" data-v="0">Ver todas</button></div></section></div>`;
+  const fp=filtroPersona(),pend=ui.filtro==="pend";
+  const segB=(v,label,on)=>`<button data-act="pendMode" data-v="${v}" class="${on?"on":""}" aria-pressed="${on}">${label}</button>`;
+  const quien=S.personas.filter(p=>p.activa||all.some(t=>dePersona(t,String(p.id))));
+  const filtro=`<div class="stack" style="gap:8px"><div class="seg" style="justify-self:start" role="group" aria-label="Qué líneas mostrar">${segB("pend",`Pendientes (${pendN})`,pend)}${segB("todas",`Todas (${all.length})`,ui.filtro==="todas")}</div>
+    <div class="row small" style="gap:6px" role="group" aria-label="Ver lo asignado a una persona"><span class="muted">Asignado a:</span>${quien.map(p=>{const on=fp&&fp.id===p.id;return `<button class="chip ${on?"on":""}" style="--c:${colorOf(p.id)}" data-act="pendMode" data-v="p:${p.id}" aria-pressed="${!!on}"><span class="dot"></span>${h(p.nombre)} <span class="num">${all.filter(t=>dePersona(t,String(p.id))).length}</span></button>`;}).join("")}</div></div>`;
+  if(all.length&&!list.length&&fp)return `<div class="stack">${filtro}<section class="panel"><h2>${h(fp.nombre)} no tiene nada asignado</h2><p class="muted">En el pago de ${h(mesLabel(S.mes))} todavía no hay líneas asignadas a ${h(fp.nombre)}.</p><div class="row"><button data-act="pendMode" data-v="pend">Ver pendientes</button><button data-act="pendMode" data-v="todas">Ver todas</button></div></section></div>`;
+  if(all.length&&!list.length)return `<div class="stack">${filtro}<section class="panel"><h2>Todas las líneas están asignadas</h2><p class="muted">No queda nada pendiente en el pago de ${h(mesLabel(S.mes))}. Para revisar o cambiar alguna, tocá <strong>Todas</strong>.</p><div class="row"><button class="primary" data-act="go" data-v="result">Ver el resultado</button><button data-act="pendMode" data-v="todas">Ver todas</button></div></section></div>`;
   if(!list.length)return `<section class="panel"><h2>No hay nada para asignar en el pago de ${h(mesLabel(S.mes))}</h2><p class="muted">${esAdmin()?"Cargá y confirmá los estados de cuenta, o registrá un gasto.":"Cuando el administrador confirme los estados de cuenta, las líneas aparecen aquí. Mientras tanto podés registrar gastos."}</p><div class="row">${esAdmin()?'<button class="primary" data-act="go" data-v="load">Ir a Cargar</button>':""}<button data-act="go" data-v="exp">Registrar un gasto</button></div></section>`;
   ui.cursor=Math.min(Math.max(0,ui.cursor),list.length-1);
   const i=ui.cursor,t=list[i],left=pendN,done=all.length-left,ai=all.indexOf(t);
@@ -747,7 +762,7 @@ function viewAssign(){
     ${otro?`<div class="banner"><span><strong>En revisión por ${h(otro)}.</strong> Para no pisarse, seguí con otra.</span><button data-act="nextFree">Ir a la siguiente libre</button></div>`:""}
     <article class="ticket">
       <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${all.length}" aria-valuenow="${done}"><i style="width:${done/all.length*100}%"></i></div>
-      <div class="head"><div class="l1"><strong class="num">${i+1} de ${list.length}${ui.soloPend?" pendientes":""}</strong>${ui.soloPend?"":`<span class="small muted">${left} sin asignar</span>`}</div><div class="l2 small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Registrado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain holder" title="${h(t.holder)}">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}</div></div>
+      <div class="head"><div class="l1"><strong class="num">${i+1} de ${list.length}${pend?" pendientes":fp?` · ${h(fp.nombre)}`:""}</strong>${pend?"":`<span class="small muted">${left} sin asignar</span>`}</div><div class="l2 small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Registrado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain holder" title="${h(t.holder)}">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}</div></div>
       <div class="body">
         <span class="muted">${showDate(t.date)}</span>
         <div class="merchant" title="${h(t.desc)}">${h(t.desc)}</div>
@@ -769,11 +784,17 @@ function viewAssign(){
     </article></div>
     <aside class="side">
       <section class="panel"><h3>Cómo va</h3><div class="tally small">
-        ${S.personas.filter(p=>p.activa||T.per[p.id].total).map(p=>`<div><span class="row" style="gap:7px;flex-wrap:nowrap"><span class="dot" style="--c:${colorOf(p.id)}"></span>${h(p.nombre)}</span><span class="num">${money(T.per[p.id].total)}</span></div>`).join("")}
+        ${S.personas.filter(p=>p.activa||T.per[p.id].total).map(p=>`<button class="trow" data-act="pendMode" data-v="p:${p.id}" aria-label="Ver lo asignado a ${h(p.nombre)}"><span class="row" style="gap:7px;flex-wrap:nowrap"><span class="dot" style="--c:${colorOf(p.id)}"></span>${h(p.nombre)}</span><span class="num">${money(T.per[p.id].total)}</span></button>`).join("")}
         <div style="border-top:1px solid var(--line);padding-top:7px"><span class="muted">Sin asignar</span><span class="num muted">${money(T.none)}</span></div>
       </div></section>
-      ${next.length?`<section class="panel"><h3>Siguen</h3><div class="queue">${next.map(j=>`<button data-act="jump" data-v="${j}"><span>${h(list[j].desc)}</span><span class="num muted">${money(list[j].amt,list[j].cur)}</span></button>`).join("")}</div></section>`:""}
+      ${fp?personaPanel(fp,list,i):next.length?`<section class="panel"><h3>Siguen</h3><div class="queue">${next.map(j=>`<button data-act="jump" data-v="${j}"><span>${h(list[j].desc)}</span><span class="num muted">${money(list[j].amt,list[j].cur)}</span></button>`).join("")}</div></section>`:""}
     </aside></div>`;
+}
+function personaPanel(p,list,i){
+  const id=String(p.id),tot=list.reduce((s,t)=>s+(montos(t)[id]||0),0);
+  return `<section class="panel"><div class="row between"><h3>Asignado a ${h(p.nombre)}</h3><button class="link small" data-act="pendMode" data-v="pend">Quitar filtro</button></div>
+    <div class="row between small"><span class="muted">${list.length} ${list.length===1?"línea":"líneas"}</span><strong class="num">${money(tot)}</strong></div>
+    <div class="queue pq">${list.map((t,j)=>{const parte=montos(t)[id]||0,comp=Object.keys(S.rep[t.id]||{}).length>1;return `<button data-act="jump" data-v="${j}" ${j===i?'aria-current="true" class="on"':""}><span>${h(t.desc)}${comp?' <span class="muted">(compartida)</span>':""}</span><span class="num muted">${money(parte)}</span></button>`;}).join("")}</div></section>`;
 }
 function openSplit(t){
   const base=asignada(t)?{mode:t.modo,parts:pesos(t)}:(suggestion(t,cola(),cola().indexOf(t))||{}).alloc;
@@ -837,7 +858,8 @@ async function asignar(t,alloc){
     ui.split=null;ui.lock[t.id]="";ui.lockFor=null;
     const full=cola(),i=full.indexOf(t);
     let nx=null;for(let k=1;k<=full.length;k++){const c=full[(i+k)%full.length];if(!asignada(c)&&!ui.lock[c.id]){nx=c;break;}}
-    ui.cursor=Math.max(0,lista().indexOf(nx||t));
+    if(filtroPersona()){const l=lista(),k=l.indexOf(t);ui.cursor=k>=0?Math.min(k+1,l.length-1):Math.min(ui.cursor,Math.max(0,l.length-1));}
+    else ui.cursor=Math.max(0,lista().indexOf(nx||t));
     toast(`${t.desc}: ${allocText(t)}`,async()=>{
       await accion(async()=>{if(prev)await q(sb.rpc("guardar_reparto",{p_tx:t.id,p_modo:prev.mode,p_pesos:prev.parts}));else await q(sb.rpc("borrar_reparto",{p_tx:t.id}));});
       ui.cursor=Math.max(0,lista().findIndex(x=>x.id===t.id));render();
@@ -1048,7 +1070,7 @@ const acts={
   addRow:v=>{const p=S.periodos.find(x=>x.id===+v);accion(()=>q(sb.from("transacciones").insert({periodo_id:p.id,mes:p.mes,tarjeta:p.tarjeta,fecha:p.corte,comercio:"Nueva línea",monto:0,origen:"pdf",estado:p.confirmado?"confirmada":"borrador",huella:`manual|${Date.now()}`})));},
   delRow:v=>accion(()=>q(sb.from("transacciones").delete().eq("id",+v)),"Línea borrada."),
   adjust:v=>{const p=S.periodos.find(x=>x.id===+v),r=cuadre(p);accion(async()=>{for(const cur of ["CRC","USD"]){const d=r.diff[cur];if(d!=null&&Math.abs(d)>=.01)await q(sb.from("transacciones").insert({periodo_id:p.id,mes:p.mes,tarjeta:p.tarjeta,fecha:p.corte,comercio:"Ajuste para cuadrar con el estado",monto:d,moneda:cur,tipo:"saldo",origen:"pdf",estado:p.confirmado?"confirmada":"borrador",huella:`ajuste|${cur}|${Date.now()}`}));}});},
-  pendMode:v=>{const cur=lista()[ui.cursor];ui.soloPend=v==="1";lsSet(LS_PEND,ui.soloPend?"1":"0");const l=lista();let j=cur?l.indexOf(cur):-1;if(j<0&&cur){const full=cola(),ci=full.indexOf(cur);for(let k=1;k<=full.length;k++){j=l.indexOf(full[(ci+k)%full.length]);if(j>=0)break;}}ui.cursor=Math.max(0,j);ui.split=null;render();},
+  pendMode:v=>{const cur=lista()[ui.cursor];ui.filtro=v==="todas"||v==="pend"||v.startsWith("p:")?v:"pend";lsSet(LS_PEND,ui.filtro==="pend"?"1":ui.filtro==="todas"?"0":ui.filtro);if(ui.view!=="assign")ui.view="assign";const l=lista();let j=cur?l.indexOf(cur):-1;if(j<0&&cur&&!filtroPersona()){const full=cola(),ci=full.indexOf(cur);for(let k=1;k<=full.length;k++){j=l.indexOf(full[(ci+k)%full.length]);if(j>=0)break;}}ui.cursor=Math.max(0,j);ui.split=null;render();},
   assign:v=>{const t=lista()[ui.cursor];if(t)asignar(t,{mode:"full",parts:{[v]:1}});},
   acceptSug:()=>{const t=lista()[ui.cursor],all=cola(),s=t&&suggestion(t,all,all.indexOf(t));if(s&&!ui.lock[t.id])asignar(t,s.alloc);},
   prev:()=>{ui.cursor=Math.max(0,ui.cursor-1);ui.split=null;render();},
