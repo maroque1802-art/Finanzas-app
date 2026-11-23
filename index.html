@@ -663,20 +663,24 @@ function viewLoad(){
     ${(f.pend||[]).map((p,i)=>`<form class="row small" data-form="pend" data-id="${f.id}" data-i="${i}"><span>No reconocí el banco (${p.rows.length} líneas). Guardar como</span><select aria-label="Tarjeta">${CARDS.map(c=>`<option value="${c.id}">${h(c.name)}</option>`).join("")}</select><button>Guardar</button></form>`).join("")}</div>`).join("");
   return `<div class="stack"><section class="panel">
     <div><h2>Estados de cuenta</h2><p class="muted small">El PDF se lee en este navegador y no se sube a ningún lado: a Supabase llegan solo las líneas. El de BAC trae Walmart y Visa juntas. Si cargás el mismo PDF dos veces, las líneas repetidas no se duplican.</p></div>
-    ${cerrado()?"":`<label class="drop" id="drop" for="fileInput"><strong>Arrastrá aquí los PDF</strong><span class="muted small">o tocá para elegirlos. En el iPhone, en Archivos tocá <strong>Explorar</strong> para ver todas tus carpetas, iCloud, Drive o lo que te llegó por correo o WhatsApp.</span><input id="fileInput" type="file" multiple hidden></label>`}
+    ${cerrado()?"":`<label class="drop" id="drop" for="fileInput"><strong>Arrastrá aquí los PDF</strong><span class="muted small">o tocá para elegirlos. En el iPhone, en Archivos tocá <strong>Explorar</strong> para ver todas tus carpetas, iCloud, Drive o lo que te llegó por correo o WhatsApp.</span><input id="fileInput" type="file" multiple hidden onclick="ui.eligiendo=Date.now()" onchange="alElegirArchivos(this)"></label>`}
     ${files?`<div class="stack" style="gap:8px">${files}</div>`:""}
     <h3>Pago de ${h(mesLabel(S.mes))}</h3>
     <div class="cards3">${slots}</div>
     <div class="row" style="justify-content:flex-end"><button class="primary" data-act="go" data-v="review" ${S.periodos.length?"":"disabled"}>Revisar lo leído</button></div>
   </section></div>`;
 }
+/* Confirma que sea un PDF por su contenido: la marca %PDF al inicio del archivo. */
+function esPdf(bytes){const n=Math.min(bytes.length,1024)-4;for(let i=0;i<=n;i++)if(bytes[i]===0x25&&bytes[i+1]===0x50&&bytes[i+2]===0x44&&bytes[i+3]===0x46)return true;return false;}
 async function handleFiles(list){
+  if(!list.length){toast("No llegó ningún archivo. Probá de nuevo eligiéndolo desde Archivos.");return;}
   for(const file of list){
-    const entry={id:uid(),name:file.name,msg:"Leyendo…"};ui.files.push(entry);render();
-    try{entry.bytes=new Uint8Array(await file.arrayBuffer());}catch(e){entry.err=true;entry.msg="No se pudo abrir el archivo.";render();continue;}
-    /* El selector muestra todos los archivos; aquí se confirma que sea un PDF por su contenido, no por el nombre. */
-    if(!new TextDecoder("latin1").decode(entry.bytes.subarray(0,1024)).includes("%PDF")){entry.err=true;entry.msg="Este archivo no es un PDF. Elegí el estado de cuenta en PDF.";delete entry.bytes;render();continue;}
-    await readEntry(entry);
+    const entry={id:uid(),name:file.name||"archivo",msg:"Leyendo…"};ui.files.push(entry);render();
+    try{
+      entry.bytes=new Uint8Array(await file.arrayBuffer());
+      if(!esPdf(entry.bytes)){entry.err=true;entry.msg="Este archivo no es un PDF. Elegí el estado de cuenta en PDF.";delete entry.bytes;render();continue;}
+      await readEntry(entry);
+    }catch(e){entry.err=true;entry.msg="No se pudo leer el archivo: "+(e&&e.message||"error desconocido");render();}
   }
 }
 async function readEntry(entry,password){
@@ -1268,7 +1272,6 @@ document.addEventListener("submit",async e=>{
 document.addEventListener("change",async e=>{
   if(e.target.dataset&&e.target.dataset.xsc){xsState().checked[e.target.dataset.xsc]=e.target.checked;xsRefresh();return;}
   const el=e.target;
-  if(el.id==="fileInput"){handleFiles([...el.files]);el.value="";return;}
   if(el.id==="mesSel"){S.mes=el.value;lsSet(LS_MES,S.mes);ui.cursor=0;ui.split=null;ui.copiandoDesc=false;await recargar();render();return;}
   if(el.id==="tcInput"){const n=parseMoney(el.value);if(n>0)accion(()=>q(sb.from("meses").upsert({mes:S.mes,tipo_cambio:n})),"Tipo de cambio actualizado; los repartos en dólares se recalcularon.");else render();return;}
   if(el.id==="expDate"||el.id==="expCard"||el.id==="expCur"){xsRefresh();ui.exp=ui.exp||{};ui.exp[el.id==="expDate"?"date":el.id==="expCard"?"card":"cur"]=el.value;const hint=document.getElementById("expHint");if(hint)hint.textContent=expHint();return;}
@@ -1338,8 +1341,11 @@ document.addEventListener("drop",e=>{
 });
 
 /* ---------- Consulta cada 60 s: solo con la pestaña visible y sin un formulario a medio llenar. ---------- */
+/* El selector de archivos del iPhone pone la app en segundo plano: al volver no se redibuja, para no perder el archivo elegido. */
+function alElegirArchivos(el){ui.eligiendo=0;const f=[...(el.files||[])];el.value="";if(f.length)handleFiles(f);}
 function formularioAMedias(){
   if(ui.split||ui.busy||ui.confirm)return true;
+  if(ui.eligiendo&&Date.now()-ui.eligiendo<5*60000)return true;
   const a=document.activeElement;
   if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return true;
   return ["expDesc","expAmt","accCorreo","accNombre"].some(id=>{const el=document.getElementById(id);return el&&el.value.trim();});
