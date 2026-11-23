@@ -463,7 +463,7 @@ function cola(){
 /* Filtro: "pend", "todas" o "p:<id de persona>" (lo que tiene asignado esa persona, aunque sea compartido). */
 const filtroPersona=()=>{if(!ui.filtro.startsWith("p:"))return null;const id=ui.filtro.slice(2);return S.personas.find(p=>String(p.id)===id)||null;};
 const dePersona=(t,id)=>!!(S.rep[t.id]&&S.rep[t.id][id]);
-function lista(){const l=cola();if(ui.filtro==="pend")return l.filter(t=>!asignada(t));const p=filtroPersona();return p?l.filter(t=>dePersona(t,String(p.id))):l;}
+function lista(){const l=cola().filter(t=>!ui.soloCard||t.card===ui.soloCard);if(ui.filtro==="pend")return l.filter(t=>!asignada(t));const p=filtroPersona();return p?l.filter(t=>dePersona(t,String(p.id))):l;}
 /* Mismo algoritmo que repartir_monto() en Postgres: colones enteros, el residuo a la primera persona. */
 function repartir(total,parts){
   const ids=S.personas.map(p=>String(p.id)).filter(id=>+parts[id]>0),sum=ids.reduce((s,k)=>s+ +parts[k],0),out={};
@@ -524,7 +524,7 @@ async function cargarMes(){
   const m=S.mes;
   const [periodos,tx,desc]=await Promise.all([
     esAdmin()?q(sb.from("periodos").select("*").eq("mes",m)):q(sb.rpc("estados_del_mes",{p_mes:m})),
-    q(sb.from("transacciones").select("*").or(`mes.eq.${m},and(origen.eq.manual,mes.gt.${m})`).order("id")),
+    q(sb.from("transacciones").select("*").or(`mes.eq.${m},and(origen.eq.manual,mes.gt.${m}),and(origen.eq.manual,mes.eq.${sumarMes(m,-1)},conciliada_con.is.null)`).order("id")),
     esAdmin()?q(sb.from("descuentos").select("*").eq("mes",m).order("orden").order("id")):q(sb.rpc("mis_descuentos",{p_mes:m}))]);
   const rep=await enLotes(tx.map(t=>t.id),ids=>q(sb.from("repartos").select("transaccion_id,persona_id,peso,monto").in("transaccion_id",ids)));
   const dp=esAdmin()?await enLotes(desc.map(d=>d.id),ids=>q(sb.from("descuentos_personas").select("*").in("descuento_id",ids))):desc.map(d=>({descuento_id:d.id,persona_id:+yo(),monto:d.monto}));
@@ -597,7 +597,7 @@ function mensajeRegistro(error){
 
 /* ---------- Render general ---------- */
 /* Bitácora de versiones: cada cambio publicado suma una versión arriba de la lista (ver CHANGELOG.md). */
-const VERSIONES=[{"v": "1.13", "fecha": "2026-11-23", "cambios": ["Número de versión en la app y lista de novedades (tocá el número de versión arriba)."]}, {"v": "1.12", "fecha": "2026-11-23", "cambios": ["Cargar: en el iPhone ya no se pierde el PDF elegido (la app se redibujaba al volver del selector y lo perdía).", "Si algo falla al leer un archivo, el aviso se muestra debajo del área de adjuntar."]}, {"v": "1.11", "fecha": "2026-11-23", "cambios": ["Cargar: el selector de archivos muestra todos tus archivos, no solo PDF; la app revisa después que sea un PDF."]}, {"v": "1.10", "fecha": "2026-11-04", "cambios": ["Arriba de todo, lo que llevás anotado en el pago. El administrador ve además el total del pago."]}, {"v": "1.9", "fecha": "2026-11-03", "cambios": ["Asignar: la usuaria solo cambia o suelta lo que asignó ella; lo que asignó el administrador queda fijo."]}, {"v": "1.8", "fecha": "2026-11-03", "cambios": ["Gastos: al registrar un gasto se reparte en partes iguales, por porcentaje o por montos, también la usuaria."]}, {"v": "1.7", "fecha": "2026-11-03", "cambios": ["La usuaria ve solo lo suyo: sus líneas, su parte de las compartidas, sus descuentos y su resultado."]}, {"v": "1.6", "fecha": "2026-11-03", "cambios": ["Asignar: ver lo asignado a cada persona, con su lista y su total."]}, {"v": "1.5", "fecha": "2026-11-03", "cambios": ["Asignar: los botones de personas ya no cambian de altura entre una línea y otra."]}, {"v": "1.4", "fecha": "2026-11-03", "cambios": ["Asignar: filtro Pendientes / Todas, con Pendientes por defecto."]}, {"v": "1.3", "fecha": "2026-11-02", "cambios": ["Colores morado y blanco."]}, {"v": "1.2", "fecha": "2026-11-02", "cambios": ["Olvidé mi contraseña."]}, {"v": "1.1", "fecha": "2026-11-02", "cambios": ["Primera versión de Finanzas sobre Supabase."]}];
+const VERSIONES=[{"v": "1.14", "fecha": "2026-11-23", "cambios": ["Cotejar: compara los gastos que anotaste con las líneas del estado (por ejemplo del Popular). Une solo lo seguro, te pregunta por lo dudoso y te lleva a distribuir lo que falta.", "Al confirmar un estado se abre Cotejar solo. También está en Revisar (Cotejar con mis gastos) y en Gastos.", "Busca también gastos anotados en el pago anterior o en los siguientes, por si la fecha de corte los dejó en otro mes.", "Asignar: se puede filtrar por tarjeta (Solo Popular, etc.)."]}, {"v": "1.13", "fecha": "2026-11-23", "cambios": ["Número de versión en la app y lista de novedades (tocá el número de versión arriba)."]}, {"v": "1.12", "fecha": "2026-11-23", "cambios": ["Cargar: en el iPhone ya no se pierde el PDF elegido (la app se redibujaba al volver del selector y lo perdía).", "Si algo falla al leer un archivo, el aviso se muestra debajo del área de adjuntar."]}, {"v": "1.11", "fecha": "2026-11-23", "cambios": ["Cargar: el selector de archivos muestra todos tus archivos, no solo PDF; la app revisa después que sea un PDF."]}, {"v": "1.10", "fecha": "2026-11-04", "cambios": ["Arriba de todo, lo que llevás anotado en el pago. El administrador ve además el total del pago."]}, {"v": "1.9", "fecha": "2026-11-03", "cambios": ["Asignar: la usuaria solo cambia o suelta lo que asignó ella; lo que asignó el administrador queda fijo."]}, {"v": "1.8", "fecha": "2026-11-03", "cambios": ["Gastos: al registrar un gasto se reparte en partes iguales, por porcentaje o por montos, también la usuaria."]}, {"v": "1.7", "fecha": "2026-11-03", "cambios": ["La usuaria ve solo lo suyo: sus líneas, su parte de las compartidas, sus descuentos y su resultado."]}, {"v": "1.6", "fecha": "2026-11-03", "cambios": ["Asignar: ver lo asignado a cada persona, con su lista y su total."]}, {"v": "1.5", "fecha": "2026-11-03", "cambios": ["Asignar: los botones de personas ya no cambian de altura entre una línea y otra."]}, {"v": "1.4", "fecha": "2026-11-03", "cambios": ["Asignar: filtro Pendientes / Todas, con Pendientes por defecto."]}, {"v": "1.3", "fecha": "2026-11-02", "cambios": ["Colores morado y blanco."]}, {"v": "1.2", "fecha": "2026-11-02", "cambios": ["Olvidé mi contraseña."]}, {"v": "1.1", "fecha": "2026-11-02", "cambios": ["Primera versión de Finanzas sobre Supabase."]}];
 function viewNovedades(){
   return `<section class="panel"><div class="row between"><h2>Novedades</h2><span class="pill plain">Versión ${VERSIONES[0].v}</span></div>
     <div class="stack" style="gap:14px">${VERSIONES.map((x,i)=>`<div class="stack" style="gap:4px;${i?"border-top:1px solid var(--line);padding-top:12px":""}"><div class="row" style="gap:8px"><strong class="num">${h(x.v)}</strong><span class="small muted">${showDate(x.fecha)}</span>${i===0?'<span class="pill good">La que tenés</span>':""}</div><ul style="margin:0;padding-left:1.2em" class="small">${x.cambios.map(c=>`<li>${h(c)}</li>`).join("")}</ul></div>`).join("")}</div></section>`;
@@ -628,7 +628,7 @@ function render(){
     ${heroHtml()}
     <nav class="steps" aria-label="Secciones">${tabs().map(([k,l])=>`<button data-act="go" data-v="${k}" class="${ui.view===k?"on":""}" ${ui.view===k?'aria-current="page"':""}>${l}${k==="assign"&&q_.length?` <span class="small muted">(${q_.length-left}/${q_.length})</span>`:""}</button>`).join("")}</nav>
     ${cerrado()?`<div class="banner"><span>Este mes está cerrado: solo se puede ver.</span>${esAdmin()?'<button data-act="reabrir">Reabrir el mes</button>':""}</div>`:""}
-    <main id="view">${({load:viewLoad,review:viewReview,assign:viewAssign,exp:viewExpenses,result:viewResult,people:viewPeople,access:viewAccess,log:viewLog,novedades:viewNovedades}[ui.view]||viewAssign)()}</main>`;
+    <main id="view">${({load:viewLoad,review:viewReview,assign:viewAssign,exp:viewExpenses,result:viewResult,people:viewPeople,access:viewAccess,log:viewLog,novedades:viewNovedades,cotejar:viewCotejar}[ui.view]||viewAssign)()}</main>`;
   setEstado();
   if(aid){const el=document.getElementById(aid);if(el)el.focus();}
   renderToast();
@@ -740,7 +740,7 @@ function viewReview(){
     const borr=rows.filter(t=>t.estado==="borrador").length;
     return `<section class="panel">
       <div class="row between"><div><h2>${h(cardOf(p.tarjeta).name)}</h2><span class="small muted">${h(p.archivo||"agregado a mano")}${p.limite?` · paga al ${showDate(p.limite)}`:""}</span></div>
-        <div class="row">${borr?`<span class="pill warn">${borr} por confirmar</span>`:'<span class="pill good">Confirmado</span>'}${borr&&!cerrado()?`<button class="primary small" data-act="confirmar" data-v="${p.id}">Confirmar ${borr} líneas</button>`:""}${cerrado()?"":`<button class="small" data-act="addRow" data-v="${p.id}">Agregar línea</button>`}</div></div>
+        <div class="row">${borr?`<span class="pill warn">${borr} por confirmar</span>`:'<span class="pill good">Confirmado</span>'}${borr&&!cerrado()?`<button class="primary small" data-act="confirmar" data-v="${p.id}">Confirmar ${borr} líneas</button>`:""}${!borr?`<button class="small" data-act="cotejar" data-v="${p.tarjeta}">Cotejar con mis gastos</button>`:""}${cerrado()?"":`<button class="small" data-act="addRow" data-v="${p.id}">Agregar línea</button>`}</div></div>
       <div class="recon">
         <label for="cc-${p.id}">Pago de contado en colones<input id="cc-${p.id}" type="text" inputmode="decimal" data-per="contado_crc" data-id="${p.id}" value="${p.contado_crc==null?"":group(+p.contado_crc)}" ${ro}></label>
         <label for="cu-${p.id}">Pago de contado en dólares<input id="cu-${p.id}" type="text" inputmode="decimal" data-per="contado_usd" data-id="${p.id}" value="${p.contado_usd==null?"":group(+p.contado_usd,true)}" ${ro}></label>
@@ -789,7 +789,7 @@ function viewAssign(){
   const segB=(v,label,on)=>`<button data-act="pendMode" data-v="${v}" class="${on?"on":""}" aria-pressed="${on}">${label}</button>`;
   const quien=esAdmin()?S.personas.filter(p=>p.activa||all.some(t=>dePersona(t,String(p.id)))):S.personas.filter(p=>String(p.id)===yo());
   const filtro=`<div class="stack" style="gap:8px"><div class="seg" style="justify-self:start" role="group" aria-label="Qué líneas mostrar">${segB("pend",`Pendientes (${pendN})`,pend)}${segB("todas",`Todas (${all.length})`,ui.filtro==="todas")}</div>
-    <div class="row small" style="gap:6px" role="group" aria-label="Ver lo asignado a una persona"><span class="muted">${esAdmin()?"Asignado a:":"Lo mío:"}</span>${quien.map(p=>{const on=fp&&fp.id===p.id;return `<button class="chip ${on?"on":""}" style="--c:${colorOf(p.id)}" data-act="pendMode" data-v="p:${p.id}" aria-pressed="${!!on}"><span class="dot"></span>${h(p.nombre)} <span class="num">${all.filter(t=>dePersona(t,String(p.id))).length}</span></button>`;}).join("")}</div></div>`;
+    <div class="row small" style="gap:6px" role="group" aria-label="Ver lo asignado a una persona">${ui.soloCard?`<button class="chip on" style="--c:var(--accent)" data-act="quitarCard" aria-label="Quitar filtro de tarjeta">Solo ${h(cardOf(ui.soloCard).short)} ✕</button>`:""}<span class="muted">${esAdmin()?"Asignado a:":"Lo mío:"}</span>${quien.map(p=>{const on=fp&&fp.id===p.id;return `<button class="chip ${on?"on":""}" style="--c:${colorOf(p.id)}" data-act="pendMode" data-v="p:${p.id}" aria-pressed="${!!on}"><span class="dot"></span>${h(p.nombre)} <span class="num">${all.filter(t=>dePersona(t,String(p.id))).length}</span></button>`;}).join("")}</div></div>`;
   if(all.length&&!list.length&&fp)return `<div class="stack">${filtro}<section class="panel"><h2>${h(fp.nombre)} no tiene nada asignado</h2><p class="muted">En el pago de ${h(mesLabel(S.mes))} todavía no hay líneas asignadas a ${h(fp.nombre)}.</p><div class="row"><button data-act="pendMode" data-v="pend">Ver pendientes</button><button data-act="pendMode" data-v="todas">Ver todas</button></div></section></div>`;
   if(all.length&&!list.length)return `<div class="stack">${filtro}<section class="panel"><h2>Todas las líneas están asignadas</h2><p class="muted">No queda nada pendiente en el pago de ${h(mesLabel(S.mes))}. Para revisar o cambiar alguna, tocá <strong>Todas</strong>.</p><div class="row"><button class="primary" data-act="go" data-v="result">Ver el resultado</button><button data-act="pendMode" data-v="todas">Ver todas</button></div></section></div>`;
   if(!list.length)return `<section class="panel"><h2>No hay nada para asignar en el pago de ${h(mesLabel(S.mes))}</h2><p class="muted">${esAdmin()?"Cargá y confirmá los estados de cuenta, o registrá un gasto.":"Cuando el administrador confirme los estados de cuenta, las líneas aparecen aquí. Mientras tanto podés registrar gastos."}</p><div class="row">${esAdmin()?'<button class="primary" data-act="go" data-v="load">Ir a Cargar</button>':""}<button data-act="go" data-v="exp">Registrar un gasto</button></div></section>`;
@@ -938,12 +938,65 @@ function estadoGasto(g){
   if(p.corte&&daysBetween(p.corte,g.date)<=3&&daysBetween(p.corte,g.date)>=0)return {cls:"warn",label:"Puede salir en el próximo estado",hint:"Se hizo muy cerca del corte"};
   return {cls:"bad",label:"No aparece en el estado",hint:`Estado con corte ${showDate(p.corte)}`};
 }
-/* Al confirmar un estado o registrar un gasto, las coincidencias exactas se concilian solas. */
-async function conciliarExactas(){
-  for(const g of S.tx.filter(x=>x.origen==="manual"&&!x.conc&&x.mes===S.mes&&(esAdmin()||x.regBy===S.sesion.user.id))){
-    const c=candidato(g);
-    if(c&&c.exacta){await q(sb.rpc("conciliar",{p_manual:g.id,p_pdf:c.t.id}));g.conc=c.t.id;}
+/* Cotejo de gastos anotados contra las líneas de los estados del pago.
+   Seguras: misma tarjeta y moneda, mismo monto, a 5 días o menos, y una sola opción de cada lado.
+   Dudas: el resto de los gastos con alguna línea parecida (o con más de una opción exacta).
+   Faltan: líneas del estado sin gasto anotado y sin asignar. */
+function cotejo(card){
+  const no=rechazos(),tomadas=new Set(S.tx.filter(x=>x.origen==="manual"&&x.conc).map(x=>x.conc));
+  const mio=g=>esAdmin()||g.regBy===S.sesion.user.id;
+  const P=S.tx.filter(t=>t.origen==="pdf"&&t.mes===S.mes&&t.estado==="confirmada"&&(t.kind==="compra"||t.kind==="cargo")&&!tomadas.has(t.id)&&(!card||t.card===card));
+  const G=S.tx.filter(g=>g.origen==="manual"&&!g.conc&&g.date&&mio(g)&&(!card||g.card===card||P.some(t=>Math.abs(t.amt-g.amt)<.01)));
+  const dias=(a,b)=>Math.abs(daysBetween(a.date,b.date));
+  const exactas=g=>P.filter(t=>t.card===g.card&&t.cur===g.cur&&Math.abs(t.amt-g.amt)<.01&&t.date&&dias(t,g)<=5&&!no.has(`${g.id}:${t.id}`));
+  const score=(g,t)=>dias(t,g)-(merchantKey(t.desc)===merchantKey(g.desc)?10:0)-(Math.abs(t.amt-g.amt)<.01?20:0)-(t.card===g.card?5:0);
+  const parecidas=g=>{const w=merchantKey(g.desc).split(" ")[0];return P.filter(t=>t.cur===g.cur&&t.date&&dias(t,g)<=7&&!no.has(`${g.id}:${t.id}`)&&(Math.abs(t.amt-g.amt)<.01||(t.card===g.card&&Math.abs(t.amt-g.amt)<=Math.abs(g.amt)*.05&&merchantKey(t.desc).split(" ")[0]===w))).sort((a,b)=>score(g,a)-score(g,b)).slice(0,3);};
+  const ex=new Map(G.map(g=>[g,exactas(g)])),usos={};
+  for(const [,ts] of ex)for(const t of ts)usos[t.id]=(usos[t.id]||0)+1;
+  const seguras=[],dudas=[],sinLinea=[];
+  for(const g of G){
+    const e=ex.get(g);
+    if(e.length===1&&usos[e[0].id]===1){seguras.push({g,t:e[0]});continue;}
+    const op=e.length?e.slice(0,3):parecidas(g);
+    if(op.length)dudas.push({g,op});
+    else if(g.mes<=S.mes&&(!card||g.card===card)){const per=periodoDe(g.card);if(per&&per.confirmado)sinLinea.push(g);}
   }
+  const enDuda=new Set(dudas.flatMap(d=>d.op.map(t=>t.id))),segIds=new Set(seguras.map(x=>x.t.id));
+  const faltan=cola().filter(t=>t.origen==="pdf"&&(!card||t.card===card)&&!asignada(t)&&!segIds.has(t.id)&&!enDuda.has(t.id));
+  return {seguras,dudas,sinLinea,faltan};
+}
+/* Al confirmar un estado, registrar un gasto o abrir Cotejar, las coincidencias seguras se unen solas. */
+async function conciliarExactas(card){
+  const hechas=[];
+  for(const {g,t} of cotejo(card).seguras){await q(sb.rpc("conciliar",{p_manual:g.id,p_pdf:t.id}));g.conc=t.id;hechas.push([g.id,t.id]);}
+  return hechas;
+}
+function viewCotejar(){
+  const c=ui.cot||{},card=c.card||"",nombre=card?cardOf(card).name:"todas las tarjetas",per=card?periodoDe(card):null;
+  if(card&&(!per||!per.confirmado))return `<section class="panel"><h2>Cotejar ${h(nombre)}</h2><p class="muted">${per?"Primero confirmá las líneas de este estado en Revisar; después se cotejan con tus gastos.":`Todavía no hay estado de ${h(nombre)} para el pago de ${h(mesLabel(S.mes))}. Cargá el PDF primero.`}</p><div class="row"><button class="primary" data-act="go" data-v="${per?"review":"load"}">${per?"Ir a Revisar":"Ir a Cargar"}</button></div></section>`;
+  const r=cotejo(card),un=(c.unidos||[]).map(([g,t])=>({g:S.tx.find(x=>x.id===g),t:S.tx.find(x=>x.id===t)})).filter(x=>x.g&&x.t&&x.g.conc===x.t.id);
+  const lado=(t,et)=>`<div class="stack" style="gap:0"><span class="small muted">${et}</span><strong>${h(t.desc)}</strong><span class="small"><span class="num">${money(t.amt,t.cur)}</span> · ${showDate(t.date)} · ${h(cardOf(t.card).short)}</span></div>`;
+  const tot=r.faltan.reduce((a,t)=>a+colones(t),0);
+  const tarjetas=CARDS.filter(x=>S.periodos.some(p=>p.tarjeta===x.id));
+  return `<div class="stack">
+    <section class="panel"><div class="row between"><h2>Cotejar mis gastos con el estado</h2>
+      <div class="seg" role="group" aria-label="Tarjeta">${[["","Todas"],...tarjetas.map(x=>[x.id,x.short])].map(([v,l])=>`<button data-act="cotejar" data-v="${v}" class="${card===v?"on":""}" aria-pressed="${card===v}">${h(l)}</button>`).join("")}</div></div>
+      <p class="small muted">Comparo los gastos que anotaste con las líneas de ${h(nombre)} del pago de ${h(mesLabel(S.mes))}. Lo seguro lo uno solo; lo dudoso te lo pregunto; lo que el estado trae y no anotaste, lo distribuís al final.</p>
+      <div class="row small"><span class="pill good">${un.length} unidas ahora</span><span class="pill ${r.dudas.length?"warn":"plain"}">${r.dudas.length} con duda</span><span class="pill ${r.faltan.length?"bad":"plain"}">${r.faltan.length} por distribuir</span></div></section>
+    ${r.dudas.length?`<section class="panel"><h3>1. Tengo dudas · ${r.dudas.length}</h3><p class="small muted">¿Alguna de estas líneas del estado es el mismo gasto que anotaste?</p>
+      ${r.dudas.map(d=>`<div class="split">${lado(d.g,"Lo que anotaste")}
+        ${d.op.map(t=>`<div class="row between" style="border-top:1px dashed var(--line);padding-top:8px">${lado(t,"En el estado")}${cerrado()?"":`<button class="small primary" data-act="expConfirm" data-v="${d.g.id}:${t.id}">Es la misma</button>`}</div>`).join("")}
+        ${cerrado()?"":`<div><button class="small" data-act="cotNinguna" data-v="${d.g.id}:${d.op.map(t=>t.id).join(",")}">${d.op.length===1?"No es la misma":"Ninguna es"}</button></div>`}</div>`).join("")}</section>`
+      :`<section class="panel"><h3>1. Dudas</h3><p class="small muted">No hay gastos con duda.</p></section>`}
+    <section class="panel"><div class="row between"><h3>2. Faltan por distribuir · ${r.faltan.length}</h3>${r.faltan.length?`<span class="num">${money(tot)}</span>`:""}</div>
+      ${r.faltan.length?`<p class="small muted">Están en el estado y todavía nadie las tiene asignadas.${r.dudas.length?" Resolvé primero las dudas: alguna podría salir de esta lista.":""}</p>
+      <div class="queue">${r.faltan.slice(0,8).map(t=>`<div class="row between small"><span>${showDate(t.date)} · ${h(t.desc)}</span><span class="num muted">${money(t.amt,t.cur)}</span></div>`).join("")}${r.faltan.length>8?`<span class="small muted">y ${r.faltan.length-8} más</span>`:""}</div>
+      <div><button class="primary" data-act="cotDistribuir" data-v="${card}">Distribuir ${r.faltan.length===1?"la línea":`las ${r.faltan.length} líneas`}</button></div>`:'<p class="small muted">Todo lo del estado ya está anotado o asignado.</p>'}</section>
+    ${un.length?`<section class="panel"><h3>Unidas automáticamente · ${un.length}</h3><p class="small muted">Mismo monto, misma tarjeta y fecha cercana. Si alguna no es, separala.</p>
+      ${un.map(x=>`<div class="row between small" style="border-bottom:1px solid var(--line);padding-bottom:6px"><span>${h(x.g.desc)} <span class="muted">→ ${h(x.t.desc)}, ${showDate(x.t.date)}</span></span><span class="row" style="gap:6px"><span class="num">${money(x.t.amt,x.t.cur)}</span>${cerrado()?"":`<button class="link small" data-act="expUnlink" data-v="${x.g.id}">No es la misma</button>`}</span></div>`).join("")}</section>`:""}
+    ${r.sinLinea.length?`<section class="panel"><h3>Anotados que no aparecen en el estado · ${r.sinLinea.length}</h3><p class="small muted">Pueden salir en el próximo estado, o haberse anotado con otra tarjeta o monto.</p>
+      ${r.sinLinea.map(g=>`<div class="row between small"><span>${showDate(g.date)} · ${h(g.desc)} · ${h(cardOf(g.card).short)}</span><span class="num">${money(g.amt,g.cur)}</span></div>`).join("")}</section>`:""}
+  </div>`;
 }
 function expHint(){
   const f=ui.exp||{},fecha=f.date||todayIso(),card=f.card||"visa",t=S.tarjetas.find(x=>x.id===card);
@@ -967,6 +1020,7 @@ function viewExpenses(){
       </tbody></table></div></section>`;
   }).join("");
   return `<div class="stack">
+    ${S.periodos.some(p=>p.confirmado)&&gastos.length?`<div class="sugbar"><span class="small">¿Ya llegó el estado? Compará lo que anotaste con lo que trae el banco.</span><button class="small primary" data-act="cotejar" data-v="">Cotejar con los estados</button></div>`:""}
     <section class="panel"><div><h2>Registrar un gasto</h2><p class="muted small">La fecha y el corte de la tarjeta dicen en qué pago entra. Cuando el estado se confirme, se concilia solo.</p></div>
       <form class="expform" data-form="exp">
         <label for="expDate">Fecha<input id="expDate" type="date" value="${h(f.date)}" required></label>
@@ -1190,7 +1244,7 @@ const acts={
   cancelConfirm:()=>{ui.confirm=null;render();},
   cerrar:()=>{ui.confirm=null;accion(()=>q(sb.rpc("cerrar_mes",{p_mes:S.mes})),"Mes cerrado. Queda solo de lectura.");},
   addStmt:v=>accion(async()=>{await q(sb.from("periodos").insert({mes:S.mes,tarjeta:v,archivo:""}));ui.view="review";}),
-  confirmar:v=>accion(async()=>{const n=await q(sb.rpc("confirmar_periodo",{p_periodo:+v}));await recargar();await conciliarExactas();toast(`${n} líneas confirmadas.`);}),
+  confirmar:v=>accion(async()=>{const n=await q(sb.rpc("confirmar_periodo",{p_periodo:+v}));await recargar();const per=S.periodos.find(p=>p.id===+v),card=per?per.tarjeta:"";const unidos=await conciliarExactas(card);await recargar();ui.cot={card,unidos};ui.view="cotejar";toast(`${n} líneas confirmadas.${unidos.length?` ${unidos.length} gastos anotados se unieron solos.`:""}`);}),
   addRow:v=>{const p=S.periodos.find(x=>x.id===+v);accion(()=>q(sb.from("transacciones").insert({periodo_id:p.id,mes:p.mes,tarjeta:p.tarjeta,fecha:p.corte,comercio:"Nueva línea",monto:0,origen:"pdf",estado:p.confirmado?"confirmada":"borrador",huella:`manual|${Date.now()}`})));},
   delRow:v=>accion(()=>q(sb.from("transacciones").delete().eq("id",+v)),"Línea borrada."),
   adjust:v=>{const p=S.periodos.find(x=>x.id===+v),r=cuadre(p);accion(async()=>{for(const cur of ["CRC","USD"]){const d=r.diff[cur];if(d!=null&&Math.abs(d)>=.01)await q(sb.from("transacciones").insert({periodo_id:p.id,mes:p.mes,tarjeta:p.tarjeta,fecha:p.corte,comercio:"Ajuste para cuadrar con el estado",monto:d,moneda:cur,tipo:"saldo",origen:"pdf",estado:p.confirmado?"confirmada":"borrador",huella:`ajuste|${cur}|${Date.now()}`}));}});},
@@ -1209,6 +1263,11 @@ const acts={
   splitRest:v=>{const t=lista()[ui.cursor],sp=ui.split,goal=sp.mode==="pct"?100:Math.abs(t.amt);const rest=round2(goal-personasActivas().reduce((s,p)=>s+(parseMoney(sp.values[p.id])||0),0));if(rest>0)sp.values[v]=sp.mode==="pct"?String(rest).replace(".",","):group(rest,t.cur==="USD"||Math.round(rest*100)%100>0);render();},
   splitApply:()=>{const t=lista()[ui.cursor],e=splitEval(t);if(e.ok)asignar(t,{mode:ui.split.mode,parts:e.parts});},
   expDel:v=>accion(()=>q(sb.from("transacciones").delete().eq("id",+v)),"Gasto borrado."),
+  cotejar:async v=>{ui.cot={card:v||"",unidos:[]};ui.view="cotejar";if(cerrado()){render();return;}
+    ui.busy=true;render();try{ui.cot.unidos=await conciliarExactas(v||"");await recargar();}catch(e){toast(errMsg(e));}finally{ui.busy=false;render();}},
+  cotNinguna:v=>{const [g,ts]=v.split(":");const s=rechazos();for(const t of ts.split(","))s.add(`${g}:${t}`);lsSet(LS_RECHAZOS,JSON.stringify([...s]));render();},
+  cotDistribuir:v=>{ui.soloCard=v||"";ui.filtro="pend";ui.cursor=0;ui.view="assign";render();},
+  quitarCard:()=>{ui.soloCard="";ui.cursor=0;render();},
   expConfirm:v=>{const [g,t]=v.split(":").map(Number);accion(()=>q(sb.rpc("conciliar",{p_manual:g,p_pdf:t})),"Gasto conciliado con el estado.");},
   expReject:v=>{const [g,t]=v.split(":").map(Number);const s=rechazos();s.add(`${g}:${t}`);lsSet(LS_RECHAZOS,JSON.stringify([...s]));const x=S.tx.find(y=>y.id===g);if(x&&x.conc===t)accion(()=>q(sb.rpc("desconciliar",{p_manual:g})));else render();},
   expUnlink:v=>{const g=S.tx.find(y=>y.id===+v);if(g){const s=rechazos();s.add(`${g.id}:${g.conc}`);lsSet(LS_RECHAZOS,JSON.stringify([...s]));}accion(()=>q(sb.rpc("desconciliar",{p_manual:+v})));},

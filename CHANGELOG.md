@@ -2,6 +2,13 @@
 
 Cada cambio publicado en la app suma una versión. El número se ve arriba en la app, a la par de *Salir*; al tocarlo se abre esta lista.
 
+## 1.14 · 23/11/2026
+
+- Cotejar: compara los gastos que anotaste con las líneas del estado (por ejemplo del Popular). Une solo lo seguro, te pregunta por lo dudoso y te lleva a distribuir lo que falta.
+- Al confirmar un estado se abre Cotejar solo. También está en Revisar (Cotejar con mis gastos) y en Gastos.
+- Busca también gastos anotados en el pago anterior o en los siguientes, por si la fecha de corte los dejó en otro mes.
+- Asignar: se puede filtrar por tarjeta (Solo Popular, etc.).
+
 ## 1.13 · 23/11/2026
 
 - Número de versión en la app y lista de novedades (tocá el número de versión arriba).
