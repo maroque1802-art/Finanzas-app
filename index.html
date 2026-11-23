@@ -663,7 +663,7 @@ function viewLoad(){
     ${(f.pend||[]).map((p,i)=>`<form class="row small" data-form="pend" data-id="${f.id}" data-i="${i}"><span>No reconocí el banco (${p.rows.length} líneas). Guardar como</span><select aria-label="Tarjeta">${CARDS.map(c=>`<option value="${c.id}">${h(c.name)}</option>`).join("")}</select><button>Guardar</button></form>`).join("")}</div>`).join("");
   return `<div class="stack"><section class="panel">
     <div><h2>Estados de cuenta</h2><p class="muted small">El PDF se lee en este navegador y no se sube a ningún lado: a Supabase llegan solo las líneas. El de BAC trae Walmart y Visa juntas. Si cargás el mismo PDF dos veces, las líneas repetidas no se duplican.</p></div>
-    ${cerrado()?"":`<label class="drop" id="drop" for="fileInput"><strong>Arrastrá aquí los PDF</strong><span class="muted small">o tocá para elegirlos</span><input id="fileInput" type="file" accept="application/pdf,.pdf" multiple hidden></label>`}
+    ${cerrado()?"":`<label class="drop" id="drop" for="fileInput"><strong>Arrastrá aquí los PDF</strong><span class="muted small">o tocá para elegirlos. En el iPhone, en Archivos tocá <strong>Explorar</strong> para ver todas tus carpetas, iCloud, Drive o lo que te llegó por correo o WhatsApp.</span><input id="fileInput" type="file" multiple hidden></label>`}
     ${files?`<div class="stack" style="gap:8px">${files}</div>`:""}
     <h3>Pago de ${h(mesLabel(S.mes))}</h3>
     <div class="cards3">${slots}</div>
@@ -674,6 +674,8 @@ async function handleFiles(list){
   for(const file of list){
     const entry={id:uid(),name:file.name,msg:"Leyendo…"};ui.files.push(entry);render();
     try{entry.bytes=new Uint8Array(await file.arrayBuffer());}catch(e){entry.err=true;entry.msg="No se pudo abrir el archivo.";render();continue;}
+    /* El selector muestra todos los archivos; aquí se confirma que sea un PDF por su contenido, no por el nombre. */
+    if(!new TextDecoder("latin1").decode(entry.bytes.subarray(0,1024)).includes("%PDF")){entry.err=true;entry.msg="Este archivo no es un PDF. Elegí el estado de cuenta en PDF.";delete entry.bytes;render();continue;}
     await readEntry(entry);
   }
 }
