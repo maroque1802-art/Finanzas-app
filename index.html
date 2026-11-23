@@ -596,6 +596,12 @@ function mensajeRegistro(error){
 }
 
 /* ---------- Render general ---------- */
+/* Bitácora de versiones: cada cambio publicado suma una versión arriba de la lista (ver CHANGELOG.md). */
+const VERSIONES=[{"v": "1.13", "fecha": "2026-11-23", "cambios": ["Número de versión en la app y lista de novedades (tocá el número de versión arriba)."]}, {"v": "1.12", "fecha": "2026-11-23", "cambios": ["Cargar: en el iPhone ya no se pierde el PDF elegido (la app se redibujaba al volver del selector y lo perdía).", "Si algo falla al leer un archivo, el aviso se muestra debajo del área de adjuntar."]}, {"v": "1.11", "fecha": "2026-11-23", "cambios": ["Cargar: el selector de archivos muestra todos tus archivos, no solo PDF; la app revisa después que sea un PDF."]}, {"v": "1.10", "fecha": "2026-11-04", "cambios": ["Arriba de todo, lo que llevás anotado en el pago. El administrador ve además el total del pago."]}, {"v": "1.9", "fecha": "2026-11-03", "cambios": ["Asignar: la usuaria solo cambia o suelta lo que asignó ella; lo que asignó el administrador queda fijo."]}, {"v": "1.8", "fecha": "2026-11-03", "cambios": ["Gastos: al registrar un gasto se reparte en partes iguales, por porcentaje o por montos, también la usuaria."]}, {"v": "1.7", "fecha": "2026-11-03", "cambios": ["La usuaria ve solo lo suyo: sus líneas, su parte de las compartidas, sus descuentos y su resultado."]}, {"v": "1.6", "fecha": "2026-11-03", "cambios": ["Asignar: ver lo asignado a cada persona, con su lista y su total."]}, {"v": "1.5", "fecha": "2026-11-03", "cambios": ["Asignar: los botones de personas ya no cambian de altura entre una línea y otra."]}, {"v": "1.4", "fecha": "2026-11-03", "cambios": ["Asignar: filtro Pendientes / Todas, con Pendientes por defecto."]}, {"v": "1.3", "fecha": "2026-11-02", "cambios": ["Colores morado y blanco."]}, {"v": "1.2", "fecha": "2026-11-02", "cambios": ["Olvidé mi contraseña."]}, {"v": "1.1", "fecha": "2026-11-02", "cambios": ["Primera versión de Finanzas sobre Supabase."]}];
+function viewNovedades(){
+  return `<section class="panel"><div class="row between"><h2>Novedades</h2><span class="pill plain">Versión ${VERSIONES[0].v}</span></div>
+    <div class="stack" style="gap:14px">${VERSIONES.map((x,i)=>`<div class="stack" style="gap:4px;${i?"border-top:1px solid var(--line);padding-top:12px":""}"><div class="row" style="gap:8px"><strong class="num">${h(x.v)}</strong><span class="small muted">${showDate(x.fecha)}</span>${i===0?'<span class="pill good">La que tenés</span>':""}</div><ul style="margin:0;padding-left:1.2em" class="small">${x.cambios.map(c=>`<li>${h(c)}</li>`).join("")}</ul></div>`).join("")}</div></section>`;
+}
 function tabs(){
   const t=[];
   if(esAdmin())t.push(["load","Cargar"],["review","Revisar"]);
@@ -617,11 +623,12 @@ function render(){
       <span class="small muted" id="estado"></span>
       <span class="small">${h(S.perfil.nombre||S.sesion.user.email)} <span class="muted">(${esAdmin()?"administrador":"usuaria"})</span></span>
       <button class="link small" data-act="salir">Salir</button>
+      <button class="link small" data-act="go" data-v="novedades" title="Ver novedades">v${VERSIONES[0].v}</button>
     </div></header>
     ${heroHtml()}
     <nav class="steps" aria-label="Secciones">${tabs().map(([k,l])=>`<button data-act="go" data-v="${k}" class="${ui.view===k?"on":""}" ${ui.view===k?'aria-current="page"':""}>${l}${k==="assign"&&q_.length?` <span class="small muted">(${q_.length-left}/${q_.length})</span>`:""}</button>`).join("")}</nav>
     ${cerrado()?`<div class="banner"><span>Este mes está cerrado: solo se puede ver.</span>${esAdmin()?'<button data-act="reabrir">Reabrir el mes</button>':""}</div>`:""}
-    <main id="view">${({load:viewLoad,review:viewReview,assign:viewAssign,exp:viewExpenses,result:viewResult,people:viewPeople,access:viewAccess,log:viewLog}[ui.view]||viewAssign)()}</main>`;
+    <main id="view">${({load:viewLoad,review:viewReview,assign:viewAssign,exp:viewExpenses,result:viewResult,people:viewPeople,access:viewAccess,log:viewLog,novedades:viewNovedades}[ui.view]||viewAssign)()}</main>`;
   setEstado();
   if(aid){const el=document.getElementById(aid);if(el)el.focus();}
   renderToast();
