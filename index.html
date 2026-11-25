@@ -544,6 +544,12 @@ async function recargar(){
   try{
     const ms=await q(sb.from("meses").select("*").order("mes",{ascending:false}));S.meses=ms;
     await cargarMes();setEstado();
+    /* Una vez por pago y por sesión: lo que coincide sin duda con el estado se une solo, sin preguntar. */
+    ui.autoCot=ui.autoCot||{};
+    if(!ui.autoCot[S.mes]&&!cerrado()&&S.sesion&&cotejo("").seguras.length){
+      ui.autoCot[S.mes]=true;
+      try{const n=(await conciliarExactas("")).length;if(n){await cargarMes();toast(n===1?"1 gasto anotado se unió solo con su línea del estado.":`${n} gastos anotados se unieron solos con su línea del estado.`);}}catch(e){}
+    }
   }catch(e){setEstado("Sin conexión: mostrando lo último que se cargó");}
 }
 async function accion(fn,okMsg){
@@ -597,7 +603,7 @@ function mensajeRegistro(error){
 
 /* ---------- Render general ---------- */
 /* Bitácora de versiones: cada cambio publicado suma una versión arriba de la lista (ver CHANGELOG.md). */
-const VERSIONES=[{"v": "1.14", "fecha": "2026-11-23", "cambios": ["Cotejar: compara los gastos que anotaste con las líneas del estado (por ejemplo del Popular). Une solo lo seguro, te pregunta por lo dudoso y te lleva a distribuir lo que falta.", "Al confirmar un estado se abre Cotejar solo. También está en Revisar (Cotejar con mis gastos) y en Gastos.", "Busca también gastos anotados en el pago anterior o en los siguientes, por si la fecha de corte los dejó en otro mes.", "Asignar: se puede filtrar por tarjeta (Solo Popular, etc.)."]}, {"v": "1.13", "fecha": "2026-11-23", "cambios": ["Número de versión en la app y lista de novedades (tocá el número de versión arriba)."]}, {"v": "1.12", "fecha": "2026-11-23", "cambios": ["Cargar: en el iPhone ya no se pierde el PDF elegido (la app se redibujaba al volver del selector y lo perdía).", "Si algo falla al leer un archivo, el aviso se muestra debajo del área de adjuntar."]}, {"v": "1.11", "fecha": "2026-11-23", "cambios": ["Cargar: el selector de archivos muestra todos tus archivos, no solo PDF; la app revisa después que sea un PDF."]}, {"v": "1.10", "fecha": "2026-11-04", "cambios": ["Arriba de todo, lo que llevás anotado en el pago. El administrador ve además el total del pago."]}, {"v": "1.9", "fecha": "2026-11-03", "cambios": ["Asignar: la usuaria solo cambia o suelta lo que asignó ella; lo que asignó el administrador queda fijo."]}, {"v": "1.8", "fecha": "2026-11-03", "cambios": ["Gastos: al registrar un gasto se reparte en partes iguales, por porcentaje o por montos, también la usuaria."]}, {"v": "1.7", "fecha": "2026-11-03", "cambios": ["La usuaria ve solo lo suyo: sus líneas, su parte de las compartidas, sus descuentos y su resultado."]}, {"v": "1.6", "fecha": "2026-11-03", "cambios": ["Asignar: ver lo asignado a cada persona, con su lista y su total."]}, {"v": "1.5", "fecha": "2026-11-03", "cambios": ["Asignar: los botones de personas ya no cambian de altura entre una línea y otra."]}, {"v": "1.4", "fecha": "2026-11-03", "cambios": ["Asignar: filtro Pendientes / Todas, con Pendientes por defecto."]}, {"v": "1.3", "fecha": "2026-11-02", "cambios": ["Colores morado y blanco."]}, {"v": "1.2", "fecha": "2026-11-02", "cambios": ["Olvidé mi contraseña."]}, {"v": "1.1", "fecha": "2026-11-02", "cambios": ["Primera versión de Finanzas sobre Supabase."]}];
+const VERSIONES=[{"v": "1.15", "fecha": "2026-11-24", "cambios": ["Al abrir la app, los gastos anotados que coinciden sin duda con una línea del estado (misma tarjeta, mismo monto, fecha cercana y una sola opción) se unen solos, sin preguntar.", "Asignar: un gasto anotado a mano dice en qué está; por ejemplo, que espera el estado de Visa y que ya está asignado, así no tenés que hacer nada."]}, {"v": "1.14", "fecha": "2026-11-23", "cambios": ["Cotejar: compara los gastos que anotaste con las líneas del estado (por ejemplo del Popular). Une solo lo seguro, te pregunta por lo dudoso y te lleva a distribuir lo que falta.", "Al confirmar un estado se abre Cotejar solo. También está en Revisar (Cotejar con mis gastos) y en Gastos.", "Busca también gastos anotados en el pago anterior o en los siguientes, por si la fecha de corte los dejó en otro mes.", "Asignar: se puede filtrar por tarjeta (Solo Popular, etc.)."]}, {"v": "1.13", "fecha": "2026-11-23", "cambios": ["Número de versión en la app y lista de novedades (tocá el número de versión arriba)."]}, {"v": "1.12", "fecha": "2026-11-23", "cambios": ["Cargar: en el iPhone ya no se pierde el PDF elegido (la app se redibujaba al volver del selector y lo perdía).", "Si algo falla al leer un archivo, el aviso se muestra debajo del área de adjuntar."]}, {"v": "1.11", "fecha": "2026-11-23", "cambios": ["Cargar: el selector de archivos muestra todos tus archivos, no solo PDF; la app revisa después que sea un PDF."]}, {"v": "1.10", "fecha": "2026-11-04", "cambios": ["Arriba de todo, lo que llevás anotado en el pago. El administrador ve además el total del pago."]}, {"v": "1.9", "fecha": "2026-11-03", "cambios": ["Asignar: la usuaria solo cambia o suelta lo que asignó ella; lo que asignó el administrador queda fijo."]}, {"v": "1.8", "fecha": "2026-11-03", "cambios": ["Gastos: al registrar un gasto se reparte en partes iguales, por porcentaje o por montos, también la usuaria."]}, {"v": "1.7", "fecha": "2026-11-03", "cambios": ["La usuaria ve solo lo suyo: sus líneas, su parte de las compartidas, sus descuentos y su resultado."]}, {"v": "1.6", "fecha": "2026-11-03", "cambios": ["Asignar: ver lo asignado a cada persona, con su lista y su total."]}, {"v": "1.5", "fecha": "2026-11-03", "cambios": ["Asignar: los botones de personas ya no cambian de altura entre una línea y otra."]}, {"v": "1.4", "fecha": "2026-11-03", "cambios": ["Asignar: filtro Pendientes / Todas, con Pendientes por defecto."]}, {"v": "1.3", "fecha": "2026-11-02", "cambios": ["Colores morado y blanco."]}, {"v": "1.2", "fecha": "2026-11-02", "cambios": ["Olvidé mi contraseña."]}, {"v": "1.1", "fecha": "2026-11-02", "cambios": ["Primera versión de Finanzas sobre Supabase."]}];
 function viewNovedades(){
   return `<section class="panel"><div class="row between"><h2>Novedades</h2><span class="pill plain">Versión ${VERSIONES[0].v}</span></div>
     <div class="stack" style="gap:14px">${VERSIONES.map((x,i)=>`<div class="stack" style="gap:4px;${i?"border-top:1px solid var(--line);padding-top:12px":""}"><div class="row" style="gap:8px"><strong class="num">${h(x.v)}</strong><span class="small muted">${showDate(x.fecha)}</span>${i===0?'<span class="pill good">La que tenés</span>':""}</div><ul style="margin:0;padding-left:1.2em" class="small">${x.cambios.map(c=>`<li>${h(c)}</li>`).join("")}</ul></div>`).join("")}</div></section>`;
@@ -810,13 +816,13 @@ function viewAssign(){
     ${otro?`<div class="banner"><span><strong>En revisión por ${h(otro)}.</strong> Para no pisarse, seguí con otra.</span><button data-act="nextFree">Ir a la siguiente libre</button></div>`:""}
     <article class="ticket">
       <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${all.length}" aria-valuenow="${done}"><i style="width:${done/all.length*100}%"></i></div>
-      <div class="head"><div class="l1"><strong class="num">${i+1} de ${list.length}${pend?" pendientes":fp?` · ${h(fp.nombre)}`:""}</strong>${pend?"":`<span class="small muted">${left} sin asignar</span>`}</div><div class="l2 small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Registrado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain holder" title="${h(t.holder)}">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}</div></div>
+      <div class="head"><div class="l1"><strong class="num">${i+1} de ${list.length}${pend?" pendientes":fp?` · ${h(fp.nombre)}`:""}</strong>${pend?"":`<span class="small muted">${left} sin asignar</span>`}</div><div class="l2 small"><span>${h(cardOf(t.card).name)}</span>${t.kind==="saldo"?'<span class="pill warn">Por pagar</span>':""}<span class="pill plain">${t.origen==="manual"?"Anotado a mano":KINDS[t.kind]}</span>${t.holder?`<span class="pill plain holder" title="${h(t.holder)}">${h(t.holder.replace(/\s*\/.*$/,""))}</span>`:""}</div></div>
       <div class="body">
         <span class="muted">${showDate(t.date)}</span>
         <div class="merchant" title="${h(t.desc)}">${h(t.desc)}</div>
         ${!esAdmin()&&compartida(t)?`<div class="amount">${money(montos(t)[yo()]||0)}</div>
         <span class="muted small tline">Tu parte de una compra compartida</span>`:`<div class="amount ${t.amt<0?"neg":""}">${money(t.amt,t.cur)}</div>
-        <span class="muted num small tline ${t.cur==="USD"?"":"off"}">${t.cur==="USD"?`${money(colones(t))} al tipo de cambio de ₡${h(String(tc()))}`:"&nbsp;"}</span>`}
+        <span class="muted num small tline ${t.cur==="USD"||t.origen==="manual"?"":"off"}">${t.cur==="USD"?`${money(colones(t))} al tipo de cambio de ₡${h(String(tc()))}`:t.origen==="manual"?`<span style="font-family:var(--body)">Espera el estado de ${h(cardOf(t.card).short)} · se une solo</span>`:"&nbsp;"}</span>`}
         <div class="astate small">${asignada(t)?`<span class="pill good">${!esAdmin()&&compartida(t)?"Compartida":"Asignada"}</span><span title="${h(allocText(t))}">${h(allocText(t))}</span>`:'<span class="pill plain">Sin asignar</span>'}</div>
       </div>
       <hr class="rip">
@@ -826,6 +832,7 @@ function viewAssign(){
           ${esAdmin()?`<button data-act="splitOpen" ${ro?"disabled":""} ${ui.split?'aria-expanded="true"':""}>Repartir <kbd class="k">R</kbd></button>`:asignada(t)&&!ajena(t)&&!cerrado()?`<button data-act="soltar" data-v="${t.id}">No es mía</button>`:compartida(t)?'<span class="small muted">Compartida: la cambia el administrador</span>':asignada(t)?'<span class="small muted">La asignó el administrador: solo él la cambia</span>':"<span></span>"}
           <span class="row"><button data-act="prev" ${i===0?"disabled":""}>Anterior</button><button data-act="next" ${i>=list.length-1?"disabled":""}>Saltar</button></span>
         </div>
+        ${t.origen==="manual"?avisoManual(t):""}
         ${sug?`<div class="sugbar"><span class="small"><strong>${h(sug.why)}:</strong> ${h(allocPreview(t,sug.alloc))}</span><button class="small primary" data-act="acceptSug">Aceptar <kbd class="k">Enter</kbd></button></div>`:""}
         ${ui.split&&!ro?splitHtml(t):""}
         <div class="keys">${esAdmin()?`<span><kbd class="k">1</kbd>–<kbd class="k">${Math.min(9,act.length)}</kbd> asigna el 100 %</span><span><kbd class="k">R</kbd> reparte</span>`:`<span><kbd class="k">1</kbd> te la asignás</span>`}<span><kbd class="k">←</kbd> <kbd class="k">→</kbd> navega</span><span><kbd class="k">Z</kbd> deshace</span></div>
@@ -838,6 +845,14 @@ function viewAssign(){
       </div></section>
       ${fp?personaPanel(fp,list,i):next.length?`<section class="panel"><h3>Siguen</h3><div class="queue">${next.map(j=>`<button data-act="jump" data-v="${j}"><span>${h(list[j].desc)}</span><span class="num muted">${money(list[j].amt,list[j].cur)}</span></button>`).join("")}</div></section>`:""}
     </aside></div>`;
+}
+/* Un gasto anotado a mano todavía no está en ningún estado: decir en qué está y qué hacer. */
+function avisoManual(t){
+  const per=periodoDe(t.card),card=cardOf(t.card).name,ya=asignada(t);
+  const que=ya?"Ya está asignado: no tenés que hacer nada.":"Asignalo ahora, o esperá a que llegue el estado.";
+  const txt=!per?`Lo anotaste a mano. Todavía no está cargado el estado de ${h(card)} del pago de ${h(mesLabel(S.mes))}; cuando lo cargues y confirmes, este gasto se une solo con su línea. ${que}`
+    :`Lo anotaste a mano. El estado de ${h(card)} está cargado pero sin confirmar; al confirmarlo en Revisar, este gasto se une solo con su línea. ${que}`;
+  return `<div class="sugbar"><span class="small">${txt}</span></div>`;
 }
 function personaPanel(p,list,i){
   const id=String(p.id),tot=list.reduce((s,t)=>s+(montos(t)[id]||0),0);

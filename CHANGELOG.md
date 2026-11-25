@@ -2,6 +2,11 @@
 
 Cada cambio publicado en la app suma una versión. El número se ve arriba en la app, a la par de *Salir*; al tocarlo se abre esta lista.
 
+## 1.15 · 24/11/2026
+
+- Al abrir la app, los gastos anotados que coinciden sin duda con una línea del estado (misma tarjeta, mismo monto, fecha cercana y una sola opción) se unen solos, sin preguntar.
+- Asignar: un gasto anotado a mano dice en qué está; por ejemplo, que espera el estado de Visa y que ya está asignado, así no tenés que hacer nada.
+
 ## 1.14 · 23/11/2026
 
 - Cotejar: compara los gastos que anotaste con las líneas del estado (por ejemplo del Popular). Une solo lo seguro, te pregunta por lo dudoso y te lleva a distribuir lo que falta.
